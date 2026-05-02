@@ -157,12 +157,21 @@ ipcMain.handle('get-usage-data', async () => {
                 console.log(`[Anthropic] Balance: $${balance}`);
             }
 
-            const spendMatch = text.match(/(?:Usage this month|Current month|사용량|이번 달)\s*[^\$]*\$?\s*([\d,]+\.?\d*)/i) ||
-                               text.match(/US?\$\s*([\d,]+\.?\d*)/i); // fallback
-            if (spendMatch && spendMatch[1]) {
-                // If it finds a generic $ value that is small, it might be spend
-                const val = parseFloat(spendMatch[1].replace(',', ''));
-                if (!balance || val < balance) spend = val; 
+            const lines = text.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].match(/(Usage this month|Current month|사용량|이번 달)/i)) {
+                    for (let j = 0; j <= 2; j++) {
+                        if (lines[i+j]) {
+                            const m = lines[i+j].match(/\$([\d,]+\.?\d*)/);
+                            if (m) {
+                                const val = parseFloat(m[1].replace(/,/g, ''));
+                                if (!balance || val < balance) spend = val;
+                                break;
+                            }
+                        }
+                    }
+                    if (spend > 0) break;
+                }
             }
         } catch (err) {
             console.error('[Anthropic] Error:', err.message);
@@ -175,10 +184,11 @@ ipcMain.handle('get-usage-data', async () => {
         try {
             const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
             console.log('[Gemini] Fetching...');
-            await win.loadURL('https://aistudio.google.com/apikey');
-            await new Promise(r => setTimeout(r, 3000)); // 5초 → 3초
+            await win.loadURL('https://aistudio.google.com/app/spend');
+            await new Promise(r => setTimeout(r, 4000));
             
             const text = await win.webContents.executeJavaScript('document.body.innerText');
+            require('fs').writeFileSync('/tmp/gemini_spend.txt', text);
             if (!win.isDestroyed()) win.close();
             
             const balanceMatch = text.match(/\$([\d,]+\.?\d*)/);
@@ -186,11 +196,29 @@ ipcMain.handle('get-usage-data', async () => {
                 balance = parseFloat(balanceMatch[1].replace(',', ''));
                 console.log(`[Gemini] Balance: $${balance}`);
             }
-            const usageMatch = text.match(/(?:usage|사용량|청구|요금)[^\$]*\$?\s*([\d,]+\.?\d*)/i);
-            if (usageMatch) {
-                spend = parseFloat(usageMatch[1].replace(',', ''));
-                console.log(`[Gemini] Spend: $${spend}`);
+            // Extract spend securely by looking for "Total cost" or "총비용"
+            const lines = text.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('총비용') || lines[i].toLowerCase().includes('total cost')) {
+                    if (lines[i+1] && (lines[i+1].includes('사용 데이터가 없습니다') || lines[i+1].toLowerCase().includes('no usage'))) {
+                        spend = 0;
+                        break;
+                    }
+                    for (let j = 1; j <= 3; j++) {
+                        if (lines[i+j]) {
+                            const match = lines[i+j].match(/([\$\₩])\s*([\d,]+\.?\d*)/);
+                            if (match) {
+                                let val = parseFloat(match[2].replace(/,/g, ''));
+                                if (match[1] === '₩') val = val / 1350; // Convert KRW to USD
+                                spend = val;
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
             }
+            console.log(`[Gemini] Spend: $${spend}`);
         } catch (err) {
             console.error('[Gemini] Error:', err.message);
         }
