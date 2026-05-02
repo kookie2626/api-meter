@@ -188,7 +188,6 @@ ipcMain.handle('get-usage-data', async () => {
             await new Promise(r => setTimeout(r, 4000));
             
             const text = await win.webContents.executeJavaScript('document.body.innerText');
-            require('fs').writeFileSync('/tmp/gemini_spend.txt', text);
             if (!win.isDestroyed()) win.close();
             
             const balanceMatch = text.match(/\$([\d,]+\.?\d*)/);
