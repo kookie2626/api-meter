@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Meter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .view-hidden { display: none !important; }
+        .settings-content { padding: 16px 18px; }
+        
+        .input-group { margin-bottom: 14px; }
+        .input-group label { 
+            display: block; margin-bottom: 5px; color: var(--text-secondary); 
+            font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; 
+        }
+        .input-group select {
+            width: 100%; padding: 10px 12px; background: var(--bg-card); 
+            color: white; border-radius: 8px; border: 1px solid var(--border-color);
+            font-size: 12px; font-family: inherit; outline: none;
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+        }
+        .input-group select:focus { border-color: var(--overview-color); }
+        
+        .key-list { margin-bottom: 16px; }
+        .key-item { 
+            background: var(--bg-card); padding: 12px 14px; border-radius: 10px; 
+            margin-bottom: 8px; display: flex; justify-content: space-between; 
+            align-items: center; border: 1px solid var(--border-color);
+            transition: border-color 0.2s;
+        }
+        .key-item:hover { border-color: rgba(255,255,255,0.1); }
+        .key-info { display: flex; flex-direction: column; gap: 2px; }
+        .key-alias { font-weight: 500; font-size: 12px; }
+        .key-val { font-size: 10px; color: var(--text-tertiary); }
+        .btn-remove { 
+            background: transparent; color: var(--danger-color); border: 1px solid var(--danger-color); 
+            border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 10px; font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-remove:hover { background: var(--danger-color); color: white; }
+        
+        .btn { 
+            background: linear-gradient(135deg, #6366F1, #818CF8); color: white; border: none; 
+            padding: 11px 16px; border-radius: 10px; cursor: pointer; width: 100%; 
+            font-size: 12px; font-weight: 600; font-family: inherit;
+            transition: all 0.2s; letter-spacing: 0.02em;
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:active { transform: translateY(0); }
+
+
+        .update-banner {
+            background: linear-gradient(135deg, #059669, #10B981);
+            color: white; padding: 10px; border-radius: 10px; margin-bottom: 12px;
+            font-size: 12px; font-weight: 600; text-align: center; cursor: pointer;
+            display: none; animation: popIn 0.3s ease-out;
+        }
+        @keyframes popIn {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Main View -->
+        <div id="main-view">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('overview')">
+                    <span class="icon">⊞</span> Overview
+                </div>
+                <div class="tab" onclick="switchTab('openai')">
+                    <span class="icon">🤖</span> OpenAI
+                </div>
+                <div class="tab" onclick="switchTab('claude')">
+                    <span class="icon">✴</span> Claude
+                </div>
+                <div class="tab" onclick="switchTab('gemini')">
+                    <span class="icon">✦</span> Gemini
+                </div>
+            </div>
+
+            <div class="content">
+                <!-- Update Banner -->
+                <div class="update-banner" id="update-banner" onclick="installUpdate()">
+                    ✨ New update available! Click to restart & install.
+                </div>
+
+                <!-- Summary Card -->
+                <div class="summary-card">
+                    <div class="section-header" style="margin-bottom: 8px;">
+                        <div class="title-group">
+                            <h2 id="section-title">Monthly Spend</h2>
+                            <span class="subtitle" id="current-month">...</span>
+                        </div>
+                    </div>
+                    <div class="summary-spend" id="total-spend-big">$0.00</div>
+                </div>
+
+                <!-- Usage Breakdown -->
+                <div class="section" id="models-section">
+                    <div class="section-header">
+                        <div class="title-group">
+                            <h2>Breakdown</h2>
+                        </div>
+                    </div>
+                    <div id="models-container">
+                        <div class="shimmer" style="margin-bottom: 8px;"></div>
+                        <div class="shimmer" style="height: 30px;"></div>
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="footer-menu">
+                    <div class="menu-item" onclick="refreshData()">↻ Refresh Data</div>
+                    <div class="menu-item" onclick="showSettings()">⚙ Settings</div>
+                    <div class="menu-item" onclick="closeApp()">✕ Quit</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings View -->
+        <div id="settings-view" class="view-hidden">
+            <div class="tabs">
+                <div class="tab active" onclick="showMain()">
+                    <span class="icon">←</span> Back
+                </div>
+                <div class="tab">
+                    <span class="icon">⚙</span> Settings
+                </div>
+            </div>
+            
+            <div class="settings-content">
+                <div class="section-header" style="margin-bottom: 18px;">
+                    <div class="title-group">
+                        <h2>Connected Accounts</h2>
+                        <span class="subtitle">Link your AI provider accounts</span>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label>Provider</label>
+                    <select id="new-key-provider">
+                        <option value="OpenAI">OpenAI</option>
+                        <option value="Anthropic">Anthropic (Claude)</option>
+                        <option value="Gemini">Google (Gemini)</option>
+                    </select>
+                </div>
+                <button id="login-btn" class="btn" onclick="loginAndAdd()" style="margin-bottom: 14px;">Login & Connect</button>
+                <div style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 18px; text-align: center; line-height: 1.5;">
+                    Securely connects to your account.<br>No passwords are stored locally.
+                </div>
+
+                <div class="divider" style="margin: 14px 0;"></div>
+                
+                <div class="key-list" id="key-list-container">
+                    <!-- Dynamic keys here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('current-month').textContent = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        
+        let savedKeys = [];
+        let globalData = { total_spend: 0, models: [] };
+        let currentTab = 'overview';
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+            document.querySelectorAll('#main-view .tab').forEach(t => t.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            renderFilteredData();
+        }
+
+        function getColorClass(modelName) {
+            const lower = modelName.toLowerCase();
+            if (lower.includes('gpt') || lower.includes('openai')) return 'openai-color';
+            if (lower.includes('claude') || lower.includes('anthropic')) return 'anthropic-color';
+            if (lower.includes('gemini')) return 'gemini-color';
+            return 'overview-color';
+        }
+
+        function renderFilteredData() {
+            const container = document.getElementById('models-container');
+            container.innerHTML = '';
+            
+            let filteredModels = globalData.models;
+            if (currentTab === 'openai') {
+                filteredModels = globalData.models.filter(m => m.name.toLowerCase().includes('gpt') || m.name.toLowerCase().includes('openai'));
+            } else if (currentTab === 'claude') {
+                filteredModels = globalData.models.filter(m => m.name.toLowerCase().includes('claude') || m.name.toLowerCase().includes('anthropic'));
+            } else if (currentTab === 'gemini') {
+                filteredModels = globalData.models.filter(m => m.name.toLowerCase().includes('gemini'));
+            }
+
+            const tabSpend = filteredModels.reduce((sum, m) => sum + m.spend, 0);
+            
+            // Update summary card
+            document.getElementById('total-spend-big').textContent = `$${tabSpend.toFixed(2)}`;
+            
+            // Update section title based on tab
+            const titles = { overview: 'Monthly Spend', openai: 'OpenAI Spend', claude: 'Claude Spend', gemini: 'Gemini Spend' };
+            document.getElementById('section-title').textContent = titles[currentTab] || 'Monthly Spend';
+
+            if (filteredModels.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; color: var(--text-tertiary); padding: 24px 0;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">📊</div>
+                        <div style="font-size: 11px;">No data available.<br>Connect an account in Settings.</div>
+                    </div>`;
+                sendResize();
+                return;
+            }
+
+            filteredModels.forEach(model => {
+                const modelPercent = tabSpend > 0 ? Math.min((model.spend / tabSpend) * 100, 100) : 0;
+                const colorClass = getColorClass(model.name);
+                
+                let balanceHtml = '';
+                if (model.balance !== undefined && model.balance !== null) {
+                    balanceHtml = `
+                        <div class="balance-row">
+                            <span class="balance-label"><span class="status-dot"></span>Credit Balance</span>
+                            <span class="balance-value">$${model.balance.toFixed(2)}</span>
+                        </div>
+                    `;
+                }
+                
+                // 모델별 상세 표시 (개별 탭에서만)
+                let subModelsHtml = '';
+                if (currentTab !== 'overview' && model.subModels && model.subModels.length > 0) {
+                    const subItems = model.subModels.map(sub => {
+                        const subPercent = model.spend > 0 ? Math.min((sub.spend / model.spend) * 100, 100) : 0;
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0;">
+                                <span style="font-size:11px; color: var(--text-secondary);">${sub.name}</span>
+                                <span style="font-size:11px; color: var(--text-secondary); font-variant-numeric: tabular-nums;">$${sub.spend.toFixed(4)}</span>
+                            </div>
+                            <div class="progress-bar" style="height:3px; margin-bottom:2px;">
+                                <div class="progress-fill ${colorClass}" style="width: ${subPercent}%; opacity: 0.7;"></div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    subModelsHtml = `
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+                            <div style="font-size:10px; color: var(--text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">Model Breakdown</div>
+                            ${subItems}
+                        </div>
+                    `;
+                }
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'item';
+                itemDiv.innerHTML = `
+                    <div class="item-header">
+                        <span class="item-name">${model.name}</span>
+                        <span class="item-value">$${model.spend.toFixed(2)}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${colorClass}" style="width: ${modelPercent}%;"></div>
+                    </div>
+                    ${balanceHtml}
+                    ${subModelsHtml}
+                `;
+                container.appendChild(itemDiv);
+            });
+            sendResize();
+        }
+
+        function refreshData() {
+            const container = document.getElementById('models-container');
+            container.innerHTML = '<div class="shimmer" style="margin-bottom: 8px;"></div><div class="shimmer" style="height: 30px;"></div>';
+            
+            if (window.electronAPI) {
+                window.electronAPI.getUsageData().then(data => {
+                    globalData = data;
+                    renderFilteredData();
+                });
+            }
+        }
+
+        function renderKeys() {
+            const container = document.getElementById('key-list-container');
+            container.innerHTML = '';
+            savedKeys.forEach((k, index) => {
+                container.innerHTML += `
+                    <div class="key-item">
+                        <div class="key-info">
+                            <span class="key-alias"><span class="status-dot"></span>${k.provider}</span>
+                            <span class="key-val">Connected · Active Session</span>
+                        </div>
+                        <button class="btn-remove" onclick="removeKey(${index})">Disconnect</button>
+                    </div>
+                `;
+            });
+            sendResize();
+        }
+
+        function loginAndAdd() {
+            const provider = document.getElementById('new-key-provider').value;
+            
+            if (savedKeys.find(k => k.provider === provider)) {
+                alert(`Already connected to ${provider}. Disconnect first.`);
+                return;
+            }
+            
+            const btn = document.getElementById('login-btn');
+            btn.textContent = 'Waiting for Login...';
+            btn.style.opacity = '0.6';
+            btn.style.pointerEvents = 'none';
+
+            if (window.electronAPI) {
+                window.electronAPI.authenticateProvider(provider, provider).then(result => {
+                    btn.textContent = 'Login & Connect';
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
+                    
+                    if (result && result.token) {
+                        savedKeys.push({
+                            provider: result.provider,
+                            alias: result.provider,
+                            key: result.token,
+                            isCookie: result.isCookie || false,
+                            partition: result.partition
+                        });
+                        window.electronAPI.saveKeys(savedKeys);
+                        renderKeys();
+                    } else {
+                        alert("Login cancelled or failed to capture session.");
+                    }
+                });
+            }
+        }
+
+        function removeKey(index) {
+            savedKeys.splice(index, 1);
+            if (window.electronAPI) window.electronAPI.saveKeys(savedKeys);
+            renderKeys();
+        }
+
+        function sendResize() {
+            if (window.electronAPI) {
+                setTimeout(() => {
+                    const height = document.querySelector('.app-container').offsetHeight;
+                    window.electronAPI.resizeWindow(340, height + 16);
+                }, 50);
+            }
+        }
+
+        function showSettings() {
+            document.getElementById('main-view').classList.add('view-hidden');
+            document.getElementById('settings-view').classList.remove('view-hidden');
+            if (window.electronAPI) {
+                window.electronAPI.loadKeys().then(keys => {
+                    savedKeys = keys || [];
+                    renderKeys();
+                });
+            } else {
+                sendResize();
+            }
+        }
+
+        function showMain() {
+            document.getElementById('settings-view').classList.add('view-hidden');
+            document.getElementById('main-view').classList.remove('view-hidden');
+            refreshData();
+        }
+
+        function closeApp() {
+            if (window.electronAPI) window.electronAPI.quitApp();
+        }
+
+        function installUpdate() {
+            if (window.electronAPI) window.electronAPI.installUpdate();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.electronAPI) {
+                refreshData();
+                window.electronAPI.onUpdateDownloaded(() => {
+                    const banner = document.getElementById('update-banner');
+                    banner.style.display = 'block';
+                    sendResize();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
