@@ -138,10 +138,18 @@ ipcMain.handle('get-usage-data', async () => {
             if (!win.isDestroyed()) win.close();
             
             const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
-                                 text.match(/(?:USD|크레딧)\s*\$?([\d,]+\.?\d*)/i);
+                                 text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
             if (balanceMatch) {
                 balance = parseFloat(balanceMatch[1].replace(',', ''));
                 console.log(`[Anthropic] Balance: $${balance}`);
+            }
+
+            const spendMatch = text.match(/(?:Usage this month|Current month|사용량|이번 달)\s*[^\$]*\$?\s*([\d,]+\.?\d*)/i) ||
+                               text.match(/US?\$\s*([\d,]+\.?\d*)/i); // fallback
+            if (spendMatch && spendMatch[1]) {
+                // If it finds a generic $ value that is small, it might be spend
+                const val = parseFloat(spendMatch[1].replace(',', ''));
+                if (!balance || val < balance) spend = val; 
             }
         } catch (err) {
             console.error('[Anthropic] Error:', err.message);
@@ -165,8 +173,11 @@ ipcMain.handle('get-usage-data', async () => {
                 balance = parseFloat(balanceMatch[1].replace(',', ''));
                 console.log(`[Gemini] Balance: $${balance}`);
             }
-            const usageMatch = text.match(/usage[^\$]*\$([\d,]+\.?\d*)/i);
-            if (usageMatch) spend = parseFloat(usageMatch[1].replace(',', ''));
+            const usageMatch = text.match(/(?:usage|사용량|청구|요금)[^\$]*\$?\s*([\d,]+\.?\d*)/i);
+            if (usageMatch) {
+                spend = parseFloat(usageMatch[1].replace(',', ''));
+                console.log(`[Gemini] Spend: $${spend}`);
+            }
         } catch (err) {
             console.error('[Gemini] Error:', err.message);
         }
