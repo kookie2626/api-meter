@@ -30,6 +30,11 @@ mb.on('ready', () => {
     // Check for updates on startup
     autoUpdater.checkForUpdatesAndNotify();
     
+    // Check for updates every 7 days (7 * 24 * 60 * 60 * 1000 = 604800000 ms)
+    setInterval(() => {
+        autoUpdater.checkForUpdatesAndNotify();
+    }, 604800000);
+    
     // Optional: Log update events
     autoUpdater.on('update-available', () => console.log('Update available.'));
     autoUpdater.on('update-downloaded', () => {
