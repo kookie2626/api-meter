@@ -1,7 +1,7 @@
 {
   "name": "api-meter",
   "productName": "API Meter",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "macOS Menu Bar API Meter",
   "main": "src/main.js",
   "repository": {
