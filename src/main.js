@@ -37,12 +37,20 @@ mb.on('ready', () => {
     
     // Optional: Log update events
     autoUpdater.on('update-available', () => console.log('Update available.'));
+    autoUpdater.on('update-not-available', () => {
+        console.log('Update not available.');
+        if (mb.window) mb.window.webContents.send('update-not-available');
+    });
     autoUpdater.on('update-downloaded', () => {
         console.log('Update downloaded. It will be installed on restart.');
         if (mb.window) {
             mb.window.webContents.send('update-downloaded');
         }
     });
+});
+
+ipcMain.handle('check-for-update', () => {
+    return autoUpdater.checkForUpdatesAndNotify();
 });
 
 // =============================================

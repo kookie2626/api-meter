@@ -118,6 +118,7 @@
                 <div class="footer-menu">
                     <div class="menu-item" onclick="refreshData()">↻ Refresh Data</div>
                     <div class="menu-item" onclick="showSettings()">⚙ Settings</div>
+                    <div class="menu-item" onclick="manualUpdateCheck()" id="btn-check-update">⬇ Check Update</div>
                     <div class="menu-item" onclick="closeApp()">✕ Quit</div>
                 </div>
             </div>
@@ -381,13 +382,41 @@
             if (window.electronAPI) window.electronAPI.installUpdate();
         }
 
+        function manualUpdateCheck() {
+            const btn = document.getElementById('btn-check-update');
+            btn.textContent = '⬇ Checking...';
+            btn.style.pointerEvents = 'none';
+            btn.style.opacity = '0.5';
+            
+            if (window.electronAPI) {
+                window.electronAPI.checkForUpdate().catch(() => {
+                    btn.textContent = '⬇ Check Update';
+                    btn.style.pointerEvents = 'auto';
+                    btn.style.opacity = '1';
+                });
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             if (window.electronAPI) {
                 refreshData();
                 window.electronAPI.onUpdateDownloaded(() => {
                     const banner = document.getElementById('update-banner');
                     banner.style.display = 'block';
+                    
+                    const btn = document.getElementById('btn-check-update');
+                    btn.textContent = '⬇ Ready to Install';
+                    
                     sendResize();
+                });
+                window.electronAPI.onUpdateNotAvailable(() => {
+                    const btn = document.getElementById('btn-check-update');
+                    btn.textContent = '⬇ Up to date!';
+                    setTimeout(() => {
+                        btn.textContent = '⬇ Check Update';
+                        btn.style.pointerEvents = 'auto';
+                        btn.style.opacity = '1';
+                    }, 3000);
                 });
             }
         });
