@@ -11,10 +11,20 @@ Never get surprised by unexpected API bills again!
 - **Auto-Updates**: Built-in OTA (Over-The-Air) updates. The app automatically checks for new versions and lets you update with a single click.
 
 ## 🚀 Installation (For Users)
+
+### Option 1: One-line Terminal Install (Recommended)
+Open your terminal and paste this command:
+```bash
+curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
+```
+This will automatically download the latest version, install it to your Applications folder, and launch it!
+
+### Option 2: Manual Download
 1. Go to the [Releases page](../../releases/latest).
 2. Download the latest `API Meter-x.x.x-arm64.dmg` file.
 3. Open the downloaded file and drag the **API Meter** app into your `Applications` folder.
-4. Launch the app, click the ⚙️ **Settings** icon, and connect your accounts!
+
+**After launching:** Click the ⚙️ **Settings** icon to connect your accounts!
 
 ## 🛠️ Development (For Developers)
 
