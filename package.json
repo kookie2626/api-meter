@@ -28,7 +28,7 @@
     },
     "dmg": {
       "title": "Install API Meter",
-      "icon": "icon.png"
+      "icon": "assets/icon.png"
     },
     "publish": [
       {
