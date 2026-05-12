@@ -2,7 +2,7 @@
   "name": "api-meter",
   "productName": "API Meter",
   "version": "1.0.1",
-  "description": "macOS Menu Bar API Meter",
+  "description": "Menu Bar / System Tray API Meter",
   "main": "src/main.js",
   "repository": {
     "type": "git",
@@ -11,7 +11,9 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win"
   },
   "build": {
     "appId": "com.keunlee.api-meter",
@@ -30,6 +32,26 @@
       "title": "Install API Meter",
       "icon": "assets/icon.png"
     },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
     "publish": [
       {
         "provider": "github",
@@ -45,6 +67,7 @@
   },
   "devDependencies": {
     "electron": "^34.5.8",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1"
   }
 }

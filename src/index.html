@@ -145,14 +145,26 @@
                 
                 <div class="input-group">
                     <label>Provider</label>
-                    <select id="new-key-provider">
+                    <select id="new-key-provider" onchange="onProviderChange(this.value)">
                         <option value="OpenAI">OpenAI</option>
                         <option value="Anthropic">Anthropic (Claude)</option>
                         <option value="Gemini">Google (Gemini)</option>
                     </select>
                 </div>
+                <div class="input-group" id="anthropic-key-group" style="display:none;">
+                    <label>Admin API Key</label>
+                    <input type="password" id="anthropic-admin-key" placeholder="sk-ant-admin..."
+                        style="width:100%; padding: 10px 12px; background: var(--bg-card); color: white;
+                               border-radius: 8px; border: 1px solid var(--border-color); font-size: 12px;
+                               font-family: inherit; outline: none; box-sizing: border-box; transition: border-color 0.2s;"
+                        onfocus="this.style.borderColor='var(--anthropic-color)'"
+                        onblur="this.style.borderColor='var(--border-color)'">
+                    <div style="font-size:10px; color: var(--text-tertiary); margin-top: 5px; line-height: 1.5;">
+                        Console → Settings → Admin Keys에서 발급
+                    </div>
+                </div>
                 <button id="login-btn" class="btn" onclick="loginAndAdd()" style="margin-bottom: 14px;">Login & Connect</button>
-                <div style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 18px; text-align: center; line-height: 1.5;">
+                <div id="login-hint" style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 18px; text-align: center; line-height: 1.5;">
                     Securely connects to your account.<br>No passwords are stored locally.
                 </div>
 
@@ -233,7 +245,7 @@
                     `;
                 }
                 
-                // 모델별 상세 표시 (개별 탭에서만)
+                // 모델별 / API 키별 상세 표시 (개별 탭에서만)
                 let subModelsHtml = '';
                 if (currentTab !== 'overview' && model.subModels && model.subModels.length > 0) {
                     const subItems = model.subModels.map(sub => {
@@ -248,11 +260,32 @@
                             </div>
                         `;
                     }).join('');
-                    
                     subModelsHtml = `
                         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color);">
                             <div style="font-size:10px; color: var(--text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">Model Breakdown</div>
                             ${subItems}
+                        </div>
+                    `;
+                }
+
+                let subKeysHtml = '';
+                if (currentTab !== 'overview' && model.subKeys && model.subKeys.length > 0) {
+                    const keyItems = model.subKeys.map(k => {
+                        const keyPercent = model.spend > 0 ? Math.min((k.spend / model.spend) * 100, 100) : 0;
+                        return `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0;">
+                                <span style="font-size:11px; color: var(--text-secondary);">🔑 ${k.name}</span>
+                                <span style="font-size:11px; color: var(--text-secondary); font-variant-numeric: tabular-nums;">$${k.spend.toFixed(4)}</span>
+                            </div>
+                            <div class="progress-bar" style="height:3px; margin-bottom:2px;">
+                                <div class="progress-fill ${colorClass}" style="width: ${keyPercent}%; opacity: 0.5;"></div>
+                            </div>
+                        `;
+                    }).join('');
+                    subKeysHtml = `
+                        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+                            <div style="font-size:10px; color: var(--text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">By API Key</div>
+                            ${keyItems}
                         </div>
                     `;
                 }
@@ -269,6 +302,7 @@
                     </div>
                     ${balanceHtml}
                     ${subModelsHtml}
+                    ${subKeysHtml}
                 `;
                 container.appendChild(itemDiv);
             });
@@ -291,11 +325,12 @@
             const container = document.getElementById('key-list-container');
             container.innerHTML = '';
             savedKeys.forEach((k, index) => {
+                const connType = k.isCookie ? 'Active Session' : 'Admin API Key';
                 container.innerHTML += `
                     <div class="key-item">
                         <div class="key-info">
                             <span class="key-alias"><span class="status-dot"></span>${k.provider}</span>
-                            <span class="key-val">Connected · Active Session</span>
+                            <span class="key-val">Connected · ${connType}</span>
                         </div>
                         <button class="btn-remove" onclick="removeKey(${index})">Disconnect</button>
                     </div>
@@ -304,14 +339,37 @@
             sendResize();
         }
 
+        function onProviderChange(value) {
+            const isAnthropic = value === 'Anthropic';
+            document.getElementById('anthropic-key-group').style.display = isAnthropic ? 'block' : 'none';
+            document.getElementById('login-btn').textContent = isAnthropic ? 'Save API Key' : 'Login & Connect';
+            document.getElementById('login-hint').innerHTML = isAnthropic
+                ? 'Admin API 키는 로컬에만 저장됩니다.'
+                : 'Securely connects to your account.<br>No passwords are stored locally.';
+        }
+
         function loginAndAdd() {
             const provider = document.getElementById('new-key-provider').value;
-            
+
             if (savedKeys.find(k => k.provider === provider)) {
                 alert(`Already connected to ${provider}. Disconnect first.`);
                 return;
             }
-            
+
+            // Anthropic: Admin API key 직접 저장
+            if (provider === 'Anthropic') {
+                const adminKey = document.getElementById('anthropic-admin-key').value.trim();
+                if (!adminKey.startsWith('sk-ant-admin')) {
+                    alert('유효한 Admin API 키를 입력해주세요.\n(sk-ant-admin... 형식)');
+                    return;
+                }
+                savedKeys.push({ provider: 'Anthropic', alias: 'Anthropic', key: adminKey, isCookie: false });
+                if (window.electronAPI) window.electronAPI.saveKeys(savedKeys);
+                document.getElementById('anthropic-admin-key').value = '';
+                renderKeys();
+                return;
+            }
+
             const btn = document.getElementById('login-btn');
             btn.textContent = 'Waiting for Login...';
             btn.style.opacity = '0.6';
@@ -322,7 +380,7 @@
                     btn.textContent = 'Login & Connect';
                     btn.style.opacity = '1';
                     btn.style.pointerEvents = 'auto';
-                    
+
                     if (result && result.token) {
                         savedKeys.push({
                             provider: result.provider,

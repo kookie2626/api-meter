@@ -6,9 +6,14 @@ const fs = require('fs');
 
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 
+const isWindows = process.platform === 'win32';
+const trayIcon = isWindows
+    ? path.join(__dirname, '../assets/icon.ico')
+    : path.join(__dirname, '../assets/iconTemplate.png');
+
 const mb = menubar({
     index: `file://${__dirname}/index.html`,
-    icon: path.join(__dirname, '../assets/iconTemplate.png'),
+    icon: trayIcon,
     browserWindow: {
         width: 340,
         height: 500,
@@ -19,14 +24,20 @@ const mb = menubar({
         },
         resizable: false,
         frame: false,
-        transparent: true
+        transparent: !isWindows,
+        backgroundColor: isWindows ? '#1a1a2e' : undefined
     },
     preloadWindow: true
 });
 
 mb.on('ready', () => {
     console.log('Menubar app is ready.');
-    
+
+    // Windows: 작업표시줄에 앱 아이콘 표시 방지 (트레이 전용)
+    if (isWindows && mb.window) {
+        mb.window.setSkipTaskbar(true);
+    }
+
     // Check for updates on startup
     autoUpdater.checkForUpdatesAndNotify();
     
@@ -140,75 +151,200 @@ ipcMain.handle('get-usage-data', async () => {
     }
 
     async function fetchAnthropic(keyObj) {
-        let spend = 0, balance = null;
+        let spend = 0, balance = null, subModels = [], subKeys = [];
+
+        // Legacy: session-based browser scraping
+        if (keyObj.isCookie) {
+            try {
+                const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+                console.log('[Anthropic] Fetching via session...');
+                await win.loadURL('https://console.anthropic.com/settings/billing');
+                await new Promise(r => setTimeout(r, 3000));
+
+                const text = await win.webContents.executeJavaScript('document.body.innerText');
+                if (!win.isDestroyed()) win.close();
+
+                const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
+                                     text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
+                if (balanceMatch) {
+                    balance = parseFloat(balanceMatch[1].replace(',', ''));
+                    console.log(`[Anthropic] Balance: $${balance}`);
+                }
+
+                const lines = text.split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].match(/(Usage this month|Current month|사용량|이번 달)/i)) {
+                        for (let j = 0; j <= 2; j++) {
+                            if (lines[i+j]) {
+                                const m = lines[i+j].match(/\$([\d,]+\.?\d*)/);
+                                if (m) {
+                                    const val = parseFloat(m[1].replace(/,/g, ''));
+                                    if (!balance || val < balance) spend = val;
+                                    break;
+                                }
+                            }
+                        }
+                        if (spend > 0) break;
+                    }
+                }
+            } catch (err) {
+                console.error('[Anthropic] Error:', err.message);
+            }
+            return { name: 'Anthropic', spend, balance };
+        }
+
+        // Admin API key path
+        try {
+            console.log('[Anthropic] Fetching via Admin API...');
+            const now = new Date();
+            const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('.')[0] + 'Z';
+            const endDate = now.toISOString().split('.')[0] + 'Z';
+            const headers = { 'x-api-key': keyObj.key, 'anthropic-version': '2023-06-01' };
+
+            // API 키 이름 조회 + 비용 리포트 병렬 실행
+            const [keyNameMap, allResults] = await Promise.all([
+                // API 키 ID → 이름 매핑
+                fetch('https://api.anthropic.com/v1/organizations/api_keys?limit=100', { headers })
+                    .then(r => r.ok ? r.json() : { data: [] })
+                    .then(json => {
+                        const map = {};
+                        (json.data || []).forEach(k => { map[k.id] = k.name || k.id; });
+                        return map;
+                    })
+                    .catch(() => ({})),
+
+                // cost_report(description) + usage_report(model+api_key_id) 병렬 조회
+                (async () => {
+                    const fetchCost = async () => {
+                        const results = [];
+                        let nextPage = null;
+                        do {
+                            const params = new URLSearchParams({ starting_at: startDate, ending_at: endDate });
+                            params.append('group_by[]', 'description');
+                            if (nextPage) params.set('page', nextPage);
+                            const res = await fetch(`https://api.anthropic.com/v1/organizations/cost_report?${params}`, { headers });
+                            if (!res.ok) break;
+                            const json = await res.json();
+                            (json.data || []).forEach(b => results.push(...(b.results || [])));
+                            nextPage = json.has_more ? json.next_page : null;
+                        } while (nextPage);
+                        return results;
+                    };
+
+                    const fetchUsage = async () => {
+                        const results = [];
+                        let nextPage = null;
+                        do {
+                            const params = new URLSearchParams({ starting_at: startDate, ending_at: endDate, bucket_width: '1d' });
+                            params.append('group_by[]', 'model');
+                            params.append('group_by[]', 'api_key_id');
+                            if (nextPage) params.set('page', nextPage);
+                            const res = await fetch(`https://api.anthropic.com/v1/organizations/usage_report/messages?${params}`, { headers });
+                            if (!res.ok) { console.error(`[Anthropic] usage_report error: ${res.status}`); break; }
+                            const json = await res.json();
+                            (json.data || []).forEach(b => results.push(...(b.results || [])));
+                            nextPage = json.has_more ? json.next_page : null;
+                        } while (nextPage);
+                        return results;
+                    };
+
+                    const [byDesc, byUsage] = await Promise.all([fetchCost(), fetchUsage().catch(() => [])]);
+                    return { byDesc, byUsage };
+                })()
+            ]);
+
+            const { byDesc, byUsage } = allResults;
+
+            // 모델별 비용 (cost_report 기준 - 정확)
+            const modelMap = {};
+            byDesc.forEach(item => {
+                const costUsd = parseFloat(item.amount || 0) / 100;
+                spend += costUsd;
+                if (costUsd <= 0) return;
+                const modelName = item.model || 'Unknown';
+                modelMap[modelName] = (modelMap[modelName] || 0) + costUsd;
+            });
+
+            subModels = Object.entries(modelMap)
+                .map(([name, cost]) => ({ name, spend: cost }))
+                .sort((a, b) => b.spend - a.spend);
+
+            // 키별 비용 = 모델별 비용 × 키별 토큰 비율 (usage_report 기준)
+            // weighted = input + 5*output (output이 ~5배 비싸므로 가중치 적용)
+            const tokensByModelAndKey = {};
+            byUsage.forEach(item => {
+                const model = item.model, keyId = item.api_key_id;
+                if (!model || !keyId) return;
+                const cacheCreate = (item.cache_creation?.ephemeral_1h_input_tokens || 0)
+                                  + (item.cache_creation?.ephemeral_5m_input_tokens || 0);
+                const w = (item.uncached_input_tokens || 0) + 5 * (item.output_tokens || 0)
+                        + 0.8 * cacheCreate + 0.1 * (item.cache_read_input_tokens || 0);
+                if (!tokensByModelAndKey[model]) tokensByModelAndKey[model] = {};
+                tokensByModelAndKey[model][keyId] = (tokensByModelAndKey[model][keyId] || 0) + w;
+            });
+
+            const keyMap = {};
+            subModels.forEach(({ name: modelName, spend: modelCost }) => {
+                const keyTokens = tokensByModelAndKey[modelName] || {};
+                const total = Object.values(keyTokens).reduce((s, t) => s + t, 0);
+                if (total === 0) return;
+                Object.entries(keyTokens).forEach(([keyId, tokens]) => {
+                    const keyName = keyNameMap[keyId] || keyId;
+                    keyMap[keyName] = (keyMap[keyName] || 0) + modelCost * (tokens / total);
+                });
+            });
+
+            subKeys = Object.entries(keyMap)
+                .map(([name, cost]) => ({ name, spend: cost }))
+                .sort((a, b) => b.spend - a.spend);
+
+            console.log(`[Anthropic] spend: $${spend.toFixed(4)}, models: ${subModels.length}, keys: ${subKeys.length}`);
+        } catch (err) {
+            console.error('[Anthropic] API error:', err.message);
+        }
+
+        // 잔액은 API로 조회 불가 — 기존 세션 쿠키로 콘솔에서 스크래핑 시도
         try {
             const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
-            console.log('[Anthropic] Fetching...');
             await win.loadURL('https://console.anthropic.com/settings/billing');
-            await new Promise(r => setTimeout(r, 3000)); // 5초 → 3초
-            
+            await new Promise(r => setTimeout(r, 3000));
             const text = await win.webContents.executeJavaScript('document.body.innerText');
             if (!win.isDestroyed()) win.close();
-            
+
             const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
                                  text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
             if (balanceMatch) {
                 balance = parseFloat(balanceMatch[1].replace(',', ''));
-                console.log(`[Anthropic] Balance: $${balance}`);
-            }
-
-            const lines = text.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].match(/(Usage this month|Current month|사용량|이번 달)/i)) {
-                    for (let j = 0; j <= 2; j++) {
-                        if (lines[i+j]) {
-                            const m = lines[i+j].match(/\$([\d,]+\.?\d*)/);
-                            if (m) {
-                                const val = parseFloat(m[1].replace(/,/g, ''));
-                                if (!balance || val < balance) spend = val;
-                                break;
-                            }
-                        }
-                    }
-                    if (spend > 0) break;
-                }
+                console.log(`[Anthropic] Balance from session: $${balance}`);
             }
         } catch (err) {
-            console.error('[Anthropic] Error:', err.message);
+            console.log('[Anthropic] Balance scrape skipped (no session)');
         }
-        return { name: 'Anthropic', spend, balance };
+
+        return { name: 'Anthropic', spend, balance, subModels, subKeys };
     }
 
     async function fetchGemini(keyObj) {
-        let spend = 0, balance = null;
+        let spend = 0;
         try {
             const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
             console.log('[Gemini] Fetching...');
             await win.loadURL('https://aistudio.google.com/app/spend');
             await new Promise(r => setTimeout(r, 4000));
-            
+
             const text = await win.webContents.executeJavaScript('document.body.innerText');
             if (!win.isDestroyed()) win.close();
-            
-            const balanceMatch = text.match(/\$([\d,]+\.?\d*)/);
-            if (balanceMatch) {
-                balance = parseFloat(balanceMatch[1].replace(',', ''));
-                console.log(`[Gemini] Balance: $${balance}`);
-            }
-            // Extract spend securely by looking for "Total cost" or "총비용"
+
             const lines = text.split('\n');
             for (let i = 0; i < lines.length; i++) {
                 if (lines[i].includes('총비용') || lines[i].toLowerCase().includes('total cost')) {
-                    if (lines[i+1] && (lines[i+1].includes('사용 데이터가 없습니다') || lines[i+1].toLowerCase().includes('no usage'))) {
-                        spend = 0;
-                        break;
-                    }
+                    if (lines[i+1] && (lines[i+1].includes('사용 데이터가 없습니다') || lines[i+1].toLowerCase().includes('no usage'))) break;
                     for (let j = 1; j <= 3; j++) {
                         if (lines[i+j]) {
-                            const match = lines[i+j].match(/([\$\₩])\s*([\d,]+\.?\d*)/);
+                            const match = lines[i+j].match(/([\$₩])\s*([\d,]+\.?\d*)/);
                             if (match) {
                                 let val = parseFloat(match[2].replace(/,/g, ''));
-                                if (match[1] === '₩') val = val / 1350; // Convert KRW to USD
+                                if (match[1] === '₩') val = val / 1350;
                                 spend = val;
                                 break;
                             }
@@ -221,7 +357,7 @@ ipcMain.handle('get-usage-data', async () => {
         } catch (err) {
             console.error('[Gemini] Error:', err.message);
         }
-        return { name: 'Gemini', spend, balance };
+        return { name: 'Gemini', spend, balance: null };
     }
 
     // 모든 프로바이더를 병렬로 실행
@@ -246,6 +382,7 @@ ipcMain.handle('get-usage-data', async () => {
         const model = { name: r.name, spend: r.spend };
         if (r.balance !== null) model.balance = r.balance;
         if (r.subModels && r.subModels.length > 0) model.subModels = r.subModels;
+        if (r.subKeys && r.subKeys.length > 0) model.subKeys = r.subKeys;
         data.models.push(model);
         data.total_spend += r.spend;
     });

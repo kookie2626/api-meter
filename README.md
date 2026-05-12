@@ -1,55 +1,86 @@
 # API Meter 📊
 
-A sleek, lightweight macOS menubar application designed to track your API usage and costs across major AI providers in one convenient place. 
+A lightweight menubar (macOS) / system tray (Windows) app that tracks your AI API usage and costs in real time.
 
 Never get surprised by unexpected API bills again!
 
 ## ✨ Features
-- **Multi-Provider Support**: Seamlessly track costs for **OpenAI**, **Anthropic (Claude)**, and **Google (Gemini)**.
-- **Secure by Design**: Your API keys and session tokens are stored **strictly locally** on your machine. No external servers or cloud databases are used.
-- **Always Accessible**: Lives quietly in your macOS menubar. Click the icon to instantly see your total spend and remaining credits.
-- **Auto-Updates**: Built-in OTA (Over-The-Air) updates. The app automatically checks for new versions and lets you update with a single click.
 
-## 🚀 Installation (For Users)
+- **Multi-Provider Support** — Track costs for **OpenAI**, **Anthropic (Claude)**, and **Google (Gemini)**
+- **Model Breakdown** — See exactly which model (GPT-4o, Claude Sonnet, etc.) is consuming your budget
+- **API Key Breakdown** — For Anthropic, see per-API-key cost distribution (requires Admin API key)
+- **Live Balance** — Remaining credits shown alongside monthly spend
+- **Secure & Local** — API keys and session tokens are stored strictly on your machine. No external servers.
+- **Auto-Updates** — Built-in OTA updates via GitHub Releases
 
-### Option 1: One-line Terminal Install (Recommended)
-Open your terminal and paste this command:
+## 📸 Providers & Data
+
+| Provider | Balance | Monthly Spend | Model Breakdown | Key Breakdown |
+|----------|---------|---------------|-----------------|---------------|
+| OpenAI | ✅ | ✅ | ✅ | ❌ |
+| Anthropic | ✅ | ✅ | ✅ | ✅ (Admin API) |
+| Gemini | ❌ | ✅ | ❌ | ❌ |
+
+## 🔑 How to connect each provider
+
+### OpenAI
+Click **Connect** and log in to [platform.openai.com](https://platform.openai.com). The app captures your session token automatically — no manual key entry needed.
+
+### Anthropic (Claude)
+Requires an **Admin API key** (not a regular API key):
+1. Go to [console.anthropic.com](https://console.anthropic.com) → **Settings → API Keys**
+2. Create an **Admin** key (the key starts with `sk-ant-admin-...`)
+3. Paste it into the app's Settings
+
+> With an Admin API key, the app fetches model-level costs via the [Anthropic Admin API](https://docs.anthropic.com/en/api/admin-api) and shows per-API-key usage breakdown for your organization.
+
+### Gemini
+Click **Connect** and log in to [aistudio.google.com](https://aistudio.google.com). The app reads your total monthly spend from the billing page.
+
+## 🚀 Installation
+
+### macOS
+
+**Option 1 — One-line install (Recommended)**
 ```bash
 curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
 ```
-This will automatically download the latest version, install it to your Applications folder, and launch it!
 
-### Option 2: Manual Download
-1. Go to the [Releases page](../../releases/latest).
-2. Download the latest `API Meter-x.x.x-arm64.dmg` file.
-3. Open the downloaded file and drag the **API Meter** app into your `Applications` folder.
+**Option 2 — Manual**
+1. Go to the [Releases page](../../releases/latest)
+2. Download `API Meter-x.x.x-arm64.dmg`
+3. Open the DMG and drag **API Meter** into your Applications folder
 
-**After launching:** Click the ⚙️ **Settings** icon to connect your accounts!
+### Windows
 
-## 🛠️ Development (For Developers)
+1. Go to the [Releases page](../../releases/latest)
+2. Download `API Meter Setup x.x.x.exe` (installer) or `API Meter x.x.x.exe` (portable)
+3. Run the installer — the app will appear in your system tray
 
-To build and run the app locally, ensure you have [Node.js](https://nodejs.org/) installed.
+## 🛠️ Development
+
+Requires [Node.js](https://nodejs.org/).
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/kookie2626/api-meter.git
 cd api-meter
-
-# 2. Install dependencies
 npm install
-
-# 3. Run the app in development mode
 npm start
-
-# 4. Build the final DMG package for release
-npm run dist
 ```
 
-> **Note for building releases**: To publish automatically to GitHub Releases, make sure to set your `GH_TOKEN` environment variable before running `npm run dist`.
+**Build for release:**
+```bash
+npm run dist:mac   # → .dmg + .zip
+npm run dist:win   # → .exe installer + portable (run on Windows)
+```
+
+> To publish to GitHub Releases, set the `GH_TOKEN` environment variable before building.
 
 ## 🔒 How it works
-- **OpenAI**: Uses the official OpenAI usage API to fetch detailed model-by-model cost breakdowns.
-- **Anthropic & Gemini**: Since these platforms do not currently offer public usage APIs, API Meter securely authenticates your active browser session and scrapes the billing dashboard to provide your total monthly spend. 
+
+- **OpenAI** — Captures the session token from your browser login and calls the official billing usage API
+- **Anthropic** — Uses the Admin API (`/v1/organizations/cost_report`, `/v1/organizations/usage_report/messages`) for accurate model costs and key-level breakdowns. Balance is read from the console billing page via your logged-in session.
+- **Gemini** — Reads total spend from the AI Studio billing page via your logged-in session. (Google does not provide a programmatic billing API)
 
 ---
 
