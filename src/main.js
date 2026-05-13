@@ -38,6 +38,11 @@ mb.on('ready', () => {
         mb.window.setSkipTaskbar(true);
     }
 
+    // macOS: 어떤 데스크톱(Space)에서 클릭해도 현재 Space에서 팝업 표시
+    if (!isWindows && mb.window) {
+        mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
+
     // Check for updates on startup
     autoUpdater.checkForUpdatesAndNotify();
     
@@ -90,12 +95,12 @@ ipcMain.handle('get-usage-data', async () => {
 
     // 각 프로바이더를 병렬로 실행하는 함수들
     async function fetchOpenAI(keyObj) {
-        let spend = 0, balance = null, subModels = [];
+        let spend = 0, balance = null, subModels = [], subKeys = [];
         try {
             const pureToken = extractToken(keyObj.key);
             const authStr = `Bearer ${pureToken}`;
             console.log(`[OpenAI] Fetching...`);
-            
+
             // 사용량 + 크레딧을 동시에 조회
             const [usageRes, creditRes] = await Promise.all([
                 fetch(`https://api.openai.com/v1/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`, {
@@ -105,11 +110,11 @@ ipcMain.handle('get-usage-data', async () => {
                     headers: { 'Authorization': authStr }
                 }).catch(() => null)
             ]);
-            
+
             if (usageRes.ok) {
                 const json = await usageRes.json();
                 spend = (json.total_usage || 0) / 100;
-                
+
                 const modelMap = {};
                 if (json.daily_costs) {
                     json.daily_costs.forEach(day => {
@@ -127,13 +132,12 @@ ipcMain.handle('get-usage-data', async () => {
                     .sort((a, b) => b.spend - a.spend);
                 console.log(`[OpenAI] Usage: $${spend.toFixed(4)}, Models: ${subModels.length}`);
             }
-            
+
             if (creditRes && creditRes.ok) {
                 const creditJson = await creditRes.json();
                 balance = creditJson.total_available || 0;
                 console.log(`[OpenAI] Balance: $${balance}`);
             } else {
-                // fallback
                 try {
                     const subRes = await fetch('https://api.openai.com/v1/dashboard/billing/subscription', {
                         headers: { 'Authorization': authStr }
@@ -147,7 +151,91 @@ ipcMain.handle('get-usage-data', async () => {
         } catch (err) {
             console.error(`[OpenAI] Error:`, err.message);
         }
-        return { name: 'OpenAI', spend, balance, subModels };
+
+        // Admin API key: API 키별 토큰 분포 조회 → 비용 비례 배분
+        if (keyObj.adminKey) {
+            try {
+                const adminHeaders = { 'Authorization': `Bearer ${keyObj.adminKey}` };
+                const now = new Date();
+                const startTs = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
+                const endTs = Math.floor(Date.now() / 1000);
+
+                const fetchUsagePage = async () => {
+                    const results = [];
+                    let nextPage = null;
+                    do {
+                        const params = new URLSearchParams({ start_time: startTs, end_time: endTs, bucket_width: '1d', limit: 31 });
+                        params.append('group_by', 'model');
+                        params.append('group_by', 'api_key_id');
+                        if (nextPage) params.set('page', nextPage);
+                        const res = await fetch(`https://api.openai.com/v1/organization/usage/completions?${params}`, { headers: adminHeaders });
+                        if (!res.ok) { console.error(`[OpenAI] Admin usage error: ${res.status}`); break; }
+                        const json = await res.json();
+                        (json.data || []).forEach(b => results.push(...(b.results || [])));
+                        nextPage = json.has_more ? json.next_page : null;
+                    } while (nextPage);
+                    return results;
+                };
+
+                const [keyNameMap, usageItems] = await Promise.all([
+                    (async () => {
+                        try {
+                            const map = {};
+                            // 프로젝트 목록 조회
+                            const projRes = await fetch('https://api.openai.com/v1/organization/projects?limit=100', { headers: adminHeaders });
+                            if (!projRes.ok) return map;
+                            const projJson = await projRes.json();
+                            const projects = projJson.data || [];
+                            // 각 프로젝트의 API 키 목록 병렬 조회
+                            await Promise.all(projects.map(async proj => {
+                                const keyRes = await fetch(`https://api.openai.com/v1/organization/projects/${proj.id}/api_keys?limit=100`, { headers: adminHeaders });
+                                if (!keyRes.ok) return;
+                                const keyJson = await keyRes.json();
+                                (keyJson.data || []).forEach(k => { map[k.id] = k.name || k.id; });
+                            }));
+                            return map;
+                        } catch(e) { return {}; }
+                    })(),
+                    fetchUsagePage().catch(() => [])
+                ]);
+
+                // 모델별 · 키별 가중 토큰 합산
+                const tokensByModelAndKey = {};
+                usageItems.forEach(item => {
+                    const model = item.model, keyId = item.api_key_id;
+                    if (!model || !keyId) return;
+                    const w = (item.input_tokens || 0) + 5 * (item.output_tokens || 0)
+                            + 0.8 * (item.input_cached_tokens || 0);
+                    if (!tokensByModelAndKey[model]) tokensByModelAndKey[model] = {};
+                    tokensByModelAndKey[model][keyId] = (tokensByModelAndKey[model][keyId] || 0) + w;
+                });
+
+                // billing/usage 모델명 정규화: "gpt-4o-2024-08-06, input" → "gpt-4o-2024-08-06"
+                const normalizeModel = name => name.replace(/,\s*(input|output|context|generation|image|audio|cached).*$/i, '').trim();
+
+                // 모델별 비용 × 토큰 비율 → 키별 비용
+                const keyMap = {};
+                subModels.forEach(({ name: modelName, spend: modelCost }) => {
+                    const keyTokens = tokensByModelAndKey[normalizeModel(modelName)] || {};
+                    const total = Object.values(keyTokens).reduce((s, t) => s + t, 0);
+                    if (total === 0) return;
+                    Object.entries(keyTokens).forEach(([keyId, tokens]) => {
+                        const keyName = keyNameMap[keyId] || keyId;
+                        keyMap[keyName] = (keyMap[keyName] || 0) + modelCost * (tokens / total);
+                    });
+                });
+
+                subKeys = Object.entries(keyMap)
+                    .map(([name, cost]) => ({ name, spend: cost }))
+                    .sort((a, b) => b.spend - a.spend);
+
+                console.log(`[OpenAI] Keys: ${subKeys.length}`);
+            } catch (err) {
+                console.error('[OpenAI] Admin API error:', err.message);
+            }
+        }
+
+        return { name: 'OpenAI', spend, balance, subModels, subKeys };
     }
 
     async function fetchAnthropic(keyObj) {
@@ -427,12 +515,15 @@ ipcMain.handle('save-keys', (event, keys) => {
 ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
     return new Promise((resolve) => {
         let resolved = false;
-        
+
+        // OpenAI는 격리된 파티션 사용 — 매번 완전 초기화로 자동로그인 방지
+        const partition = provider === 'OpenAI' ? 'auth-openai' : undefined;
         const authWin = new BrowserWindow({
             width: 800,
             height: 800,
             webPreferences: {
-                nodeIntegration: false
+                nodeIntegration: false,
+                ...(partition ? { partition } : {})
             },
             title: `Login to ${provider}`
         });
@@ -440,25 +531,27 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
         console.log(`[Auth] Starting authentication for: ${provider}`);
 
         if (provider === 'OpenAI') {
-            // OpenAI: 네트워크 요청에서 세션 토큰 캡처
-            const filter = { urls: ['*://*.openai.com/*'] };
-            authWin.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
-                if (resolved) {
+            // OpenAI: 격리 파티션의 모든 스토리지 초기화 후 로그인 페이지 로드
+            authWin.webContents.session.clearStorageData().then(() => {
+                const filter = { urls: ['*://*.openai.com/*'] };
+                authWin.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+                    if (resolved) {
+                        callback({ requestHeaders: details.requestHeaders });
+                        return;
+                    }
+                    const authHeader = details.requestHeaders['Authorization'] || details.requestHeaders['authorization'];
+                    if (authHeader && authHeader.includes('sess-')) {
+                        resolved = true;
+                        callback({ requestHeaders: details.requestHeaders });
+                        console.log(`[Auth] OpenAI session token captured!`);
+                        setTimeout(() => { if (!authWin.isDestroyed()) authWin.close(); }, 100);
+                        resolve({ provider, alias, token: authHeader });
+                        return;
+                    }
                     callback({ requestHeaders: details.requestHeaders });
-                    return;
-                }
-                const authHeader = details.requestHeaders['Authorization'] || details.requestHeaders['authorization'];
-                if (authHeader && authHeader.includes('sess-')) {
-                    resolved = true;
-                    callback({ requestHeaders: details.requestHeaders });
-                    console.log(`[Auth] OpenAI session token captured!`);
-                    setTimeout(() => { if (!authWin.isDestroyed()) authWin.close(); }, 100);
-                    resolve({ provider, alias, token: authHeader });
-                    return;
-                }
-                callback({ requestHeaders: details.requestHeaders });
+                });
+                authWin.loadURL('https://platform.openai.com/login');
             });
-            authWin.loadURL('https://platform.openai.com/login');
             
         } else if (provider === 'Anthropic') {
             // Anthropic: 페이지 타이틀 + URL 폴링으로 로그인 완료 감지

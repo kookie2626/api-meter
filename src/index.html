@@ -163,6 +163,20 @@
                         Console → Settings → Admin Keys에서 발급
                     </div>
                 </div>
+                <div id="openai-admin-key-group" style="display:none;">
+                    <div class="input-group">
+                        <label>Admin API Key <span style="color: var(--text-tertiary); font-size:9px; text-transform:none; letter-spacing:0;">(선택 — API 키별 내역 표시)</span></label>
+                        <input type="password" id="openai-admin-key" placeholder="sk-admin-..."
+                            style="width:100%; padding: 10px 12px; background: var(--bg-card); color: white;
+                                   border-radius: 8px; border: 1px solid var(--border-color); font-size: 12px;
+                                   font-family: inherit; outline: none; box-sizing: border-box; transition: border-color 0.2s;"
+                            onfocus="this.style.borderColor='var(--openai-color)'"
+                            onblur="this.style.borderColor='var(--border-color)'">
+                        <div style="font-size:10px; color: var(--text-tertiary); margin-top: 5px; line-height: 1.5;">
+                            platform.openai.com → Settings → API Keys → Create Admin Key
+                        </div>
+                    </div>
+                </div>
                 <button id="login-btn" class="btn" onclick="loginAndAdd()" style="margin-bottom: 14px;">Login & Connect</button>
                 <div id="login-hint" style="font-size: 10px; color: var(--text-tertiary); margin-bottom: 18px; text-align: center; line-height: 1.5;">
                     Securely connects to your account.<br>No passwords are stored locally.
@@ -179,6 +193,7 @@
 
     <script>
         document.getElementById('current-month').textContent = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        onProviderChange(document.getElementById('new-key-provider').value);
         
         let savedKeys = [];
         let globalData = { total_spend: 0, models: [] };
@@ -325,7 +340,8 @@
             const container = document.getElementById('key-list-container');
             container.innerHTML = '';
             savedKeys.forEach((k, index) => {
-                const connType = k.isCookie ? 'Active Session' : 'Admin API Key';
+                let connType = k.isCookie ? 'Active Session' : 'Admin API Key';
+                if (k.isCookie && k.adminKey) connType = 'Session + Admin API Key';
                 container.innerHTML += `
                     <div class="key-item">
                         <div class="key-info">
@@ -341,7 +357,9 @@
 
         function onProviderChange(value) {
             const isAnthropic = value === 'Anthropic';
+            const isOpenAI = value === 'OpenAI';
             document.getElementById('anthropic-key-group').style.display = isAnthropic ? 'block' : 'none';
+            document.getElementById('openai-admin-key-group').style.display = isOpenAI ? 'block' : 'none';
             document.getElementById('login-btn').textContent = isAnthropic ? 'Save API Key' : 'Login & Connect';
             document.getElementById('login-hint').innerHTML = isAnthropic
                 ? 'Admin API 키는 로컬에만 저장됩니다.'
@@ -382,13 +400,19 @@
                     btn.style.pointerEvents = 'auto';
 
                     if (result && result.token) {
-                        savedKeys.push({
+                        const entry = {
                             provider: result.provider,
                             alias: result.provider,
                             key: result.token,
                             isCookie: result.isCookie || false,
                             partition: result.partition
-                        });
+                        };
+                        if (result.provider === 'OpenAI') {
+                            const adminKey = document.getElementById('openai-admin-key').value.trim();
+                            if (adminKey) entry.adminKey = adminKey;
+                            document.getElementById('openai-admin-key').value = '';
+                        }
+                        savedKeys.push(entry);
                         window.electronAPI.saveKeys(savedKeys);
                         renderKeys();
                     } else {
