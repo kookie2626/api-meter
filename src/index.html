@@ -335,7 +335,7 @@
                 // 모델별 / API 키별 상세 표시 (개별 탭에서만)
                 let subModelsHtml = '';
                 if (currentTab !== 'overview' && model.subModels && model.subModels.length > 0) {
-                    const subItems = model.subModels.map(sub => {
+                    const subItems = model.subModels.filter(sub => sub.spend >= 0.00005).map(sub => {
                         const subPercent = model.spend > 0 ? Math.min((sub.spend / model.spend) * 100, 100) : 0;
                         return `
                             <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0;">
@@ -357,7 +357,7 @@
 
                 let subKeysHtml = '';
                 if (currentTab !== 'overview' && model.subKeys && model.subKeys.length > 0) {
-                    const keyItems = model.subKeys.map(k => {
+                    const keyItems = model.subKeys.filter(k => k.spend >= 0.00005).map(k => {
                         const keyPercent = model.spend > 0 ? Math.min((k.spend / model.spend) * 100, 100) : 0;
                         return `
                             <div style="display:flex; justify-content:space-between; align-items:center; padding: 4px 0;">
