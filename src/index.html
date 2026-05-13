@@ -72,13 +72,13 @@
                 <div class="tab active" onclick="switchTab('overview')">
                     <span class="icon">⊞</span> Overview
                 </div>
-                <div class="tab" onclick="switchTab('openai')">
+                <div class="tab" id="tab-openai" onclick="switchTab('openai')" style="display:none;">
                     <span class="icon">🤖</span> OpenAI
                 </div>
-                <div class="tab" onclick="switchTab('claude')">
+                <div class="tab" id="tab-claude" onclick="switchTab('claude')" style="display:none;">
                     <span class="icon">✴</span> Claude
                 </div>
-                <div class="tab" onclick="switchTab('gemini')">
+                <div class="tab" id="tab-gemini" onclick="switchTab('gemini')" style="display:none;">
                     <span class="icon">✦</span> Gemini
                 </div>
             </div>
@@ -98,6 +98,7 @@
                         </div>
                     </div>
                     <div class="summary-spend" id="total-spend-big">$0.00</div>
+                    <div id="last-updated" style="font-size: 10px; color: var(--text-tertiary); margin-top: 6px; display: none;"></div>
                 </div>
 
                 <!-- Usage Breakdown -->
@@ -183,7 +184,28 @@
                 </div>
 
                 <div class="divider" style="margin: 14px 0;"></div>
-                
+
+                <div style="margin-bottom: 14px;">
+                    <div class="section-header" style="margin-bottom: 10px;">
+                        <div class="title-group">
+                            <h2>Auto Refresh</h2>
+                            <span class="subtitle">Background data refresh interval</span>
+                        </div>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label>Interval</label>
+                        <select id="refresh-interval-select" onchange="saveRefreshInterval(this.value)">
+                            <option value="0">끄기 (수동 새로고침)</option>
+                            <option value="5">5분마다</option>
+                            <option value="15">15분마다</option>
+                            <option value="30">30분마다</option>
+                            <option value="60">1시간마다</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="divider" style="margin: 14px 0;"></div>
+
                 <div class="key-list" id="key-list-container">
                     <!-- Dynamic keys here -->
                 </div>
@@ -198,6 +220,56 @@
         let savedKeys = [];
         let globalData = { total_spend: 0, models: [] };
         let currentTab = 'overview';
+        let lastUpdatedTimer = null;
+
+        function formatLastUpdate(fetchedAt) {
+            if (!fetchedAt) return null;
+            const diffSec = Math.floor((Date.now() - fetchedAt) / 1000);
+            if (diffSec < 10) return '방금 업데이트';
+            if (diffSec < 60) return `${diffSec}초 전 업데이트`;
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return `${diffMin}분 전 업데이트`;
+            const diffHr = Math.floor(diffMin / 60);
+            return `${diffHr}시간 전 업데이트`;
+        }
+
+        function updateLastUpdatedLabel() {
+            const el = document.getElementById('last-updated');
+            if (!el) return;
+            if (!globalData.fetchedAt) { el.style.display = 'none'; return; }
+            el.textContent = formatLastUpdate(globalData.fetchedAt);
+            el.style.display = 'block';
+        }
+
+        function startLastUpdatedTick() {
+            if (lastUpdatedTimer) clearInterval(lastUpdatedTimer);
+            lastUpdatedTimer = setInterval(updateLastUpdatedLabel, 30000);
+        }
+
+        function saveRefreshInterval(minutes) {
+            const val = parseInt(minutes, 10);
+            if (window.electronAPI) {
+                window.electronAPI.saveRefreshInterval(val);
+            }
+        }
+
+        function updateTabVisibility() {
+            const hasOpenAI = globalData.models.some(m => m.name === 'OpenAI');
+            const hasClaude = globalData.models.some(m => m.name === 'Anthropic');
+            const hasGemini = globalData.models.some(m => m.name === 'Gemini');
+
+            document.getElementById('tab-openai').style.display = hasOpenAI ? '' : 'none';
+            document.getElementById('tab-claude').style.display = hasClaude ? '' : 'none';
+            document.getElementById('tab-gemini').style.display = hasGemini ? '' : 'none';
+
+            if ((currentTab === 'openai' && !hasOpenAI) ||
+                (currentTab === 'claude' && !hasClaude) ||
+                (currentTab === 'gemini' && !hasGemini)) {
+                currentTab = 'overview';
+                document.querySelectorAll('#main-view .tab').forEach(t => t.classList.remove('active'));
+                document.querySelector('#main-view .tab:first-child').classList.add('active');
+            }
+        }
 
         function switchTab(tabName) {
             currentTab = tabName;
@@ -331,7 +403,10 @@
             if (window.electronAPI) {
                 window.electronAPI.getUsageData().then(data => {
                     globalData = data;
+                    updateTabVisibility();
                     renderFilteredData();
+                    updateLastUpdatedLabel();
+                    startLastUpdatedTick();
                 });
             }
         }
@@ -462,9 +537,14 @@
             document.getElementById('main-view').classList.add('view-hidden');
             document.getElementById('settings-view').classList.remove('view-hidden');
             if (window.electronAPI) {
-                window.electronAPI.loadKeys().then(keys => {
+                Promise.all([
+                    window.electronAPI.loadKeys(),
+                    window.electronAPI.getRefreshInterval()
+                ]).then(([keys, interval]) => {
                     savedKeys = keys || [];
                     renderKeys();
+                    const sel = document.getElementById('refresh-interval-select');
+                    if (sel) sel.value = String(interval || 0);
                 });
             } else {
                 sendResize();
@@ -503,6 +583,13 @@
         window.addEventListener('DOMContentLoaded', () => {
             if (window.electronAPI) {
                 refreshData();
+                window.electronAPI.onUsageDataUpdated((data) => {
+                    globalData = data;
+                    updateTabVisibility();
+                    renderFilteredData();
+                    updateLastUpdatedLabel();
+                    startLastUpdatedTick();
+                });
                 window.electronAPI.onUpdateDownloaded(() => {
                     const banner = document.getElementById('update-banner');
                     banner.style.display = 'block';

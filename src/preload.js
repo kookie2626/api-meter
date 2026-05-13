@@ -12,5 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     installUpdate: () => ipcRenderer.invoke('install-update'),
     checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
     onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback),
-    onUpdateNotAvailable: (callback) => ipcRenderer.on('update-not-available', callback)
+    onUpdateNotAvailable: (callback) => ipcRenderer.on('update-not-available', callback),
+    onUsageDataUpdated: (callback) => ipcRenderer.on('usage-data-updated', (event, data) => callback(data)),
+    getRefreshInterval: () => ipcRenderer.invoke('get-refresh-interval'),
+    saveRefreshInterval: (minutes) => ipcRenderer.invoke('save-refresh-interval', minutes)
 });

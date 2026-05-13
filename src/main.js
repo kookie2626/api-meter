@@ -43,6 +43,9 @@ mb.on('ready', () => {
         mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
 
+    // 자동 새로고침 시작
+    startAutoRefresh();
+
     // Check for updates on startup
     autoUpdater.checkForUpdatesAndNotify();
     
@@ -79,10 +82,26 @@ function extractToken(raw) {
     return raw.replace(/^Bearer\s+/i, '').trim();
 }
 
-// 캐시: 마지막 조회 결과를 저장해 즉시 표시
+// 캐시 및 자동 새로고침
 let lastUsageData = null;
+let autoRefreshTimer = null;
 
-ipcMain.handle('get-usage-data', async () => {
+function startAutoRefresh() {
+    if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+    const settings = getSettings();
+    const intervalMin = settings.refreshInterval;
+    if (!intervalMin || intervalMin <= 0) return;
+    autoRefreshTimer = setInterval(async () => {
+        console.log('[AutoRefresh] Refreshing...');
+        const data = await fetchAllData();
+        if (mb.window && !mb.window.isDestroyed()) {
+            mb.window.webContents.send('usage-data-updated', data);
+        }
+    }, intervalMin * 60 * 1000);
+    console.log(`[AutoRefresh] Interval set: ${intervalMin}min`);
+}
+
+async function fetchAllData() {
     const settings = getSettings();
     const keys = settings.keys || [];
     
@@ -464,11 +483,7 @@ ipcMain.handle('get-usage-data', async () => {
     const results = await Promise.all(fetchPromises);
     console.timeEnd('[Perf] Total fetch');
 
-    const data = {
-        total_spend: 0.0,
-
-        models: []
-    };
+    const data = { total_spend: 0.0, models: [], fetchedAt: Date.now() };
 
     results.forEach(r => {
         const model = { name: r.name, spend: r.spend };
@@ -478,10 +493,24 @@ ipcMain.handle('get-usage-data', async () => {
         data.models.push(model);
         data.total_spend += r.spend;
     });
-    
+
     data.models.sort((a, b) => b.spend - a.spend);
     lastUsageData = data;
     return data;
+}
+
+ipcMain.handle('get-usage-data', () => fetchAllData());
+
+ipcMain.handle('get-refresh-interval', () => {
+    return getSettings().refreshInterval || 0;
+});
+
+ipcMain.handle('save-refresh-interval', (event, minutes) => {
+    const settings = getSettings();
+    settings.refreshInterval = minutes;
+    saveSettings(settings);
+    startAutoRefresh();
+    return true;
 });
 
 // =============================================
