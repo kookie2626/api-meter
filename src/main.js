@@ -391,22 +391,26 @@ ipcMain.handle('get-usage-data', async () => {
             console.error('[Anthropic] API error:', err.message);
         }
 
-        // 잔액은 API로 조회 불가 — 기존 세션 쿠키로 콘솔에서 스크래핑 시도
-        try {
-            const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
-            await win.loadURL('https://console.anthropic.com/settings/billing');
-            await new Promise(r => setTimeout(r, 3000));
-            const text = await win.webContents.executeJavaScript('document.body.innerText');
-            if (!win.isDestroyed()) win.close();
+        // 잔액: 세션 쿠키가 있을 때만 스크래핑 시도
+        if (keyObj.isCookie || keyObj.cookieSession) {
+            try {
+                const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+                await win.loadURL('https://console.anthropic.com/settings/billing');
+                await new Promise(r => setTimeout(r, 3000));
+                const text = await win.webContents.executeJavaScript('document.body.innerText');
+                if (!win.isDestroyed()) win.close();
 
-            const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
-                                 text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
-            if (balanceMatch) {
-                balance = parseFloat(balanceMatch[1].replace(',', ''));
-                console.log(`[Anthropic] Balance from session: $${balance}`);
+                const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
+                                     text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
+                if (balanceMatch) {
+                    balance = parseFloat(balanceMatch[1].replace(',', ''));
+                    console.log(`[Anthropic] Balance from session: $${balance}`);
+                } else {
+                    console.log('[Anthropic] Balance: session expired, re-login needed');
+                }
+            } catch (err) {
+                console.log('[Anthropic] Balance scrape skipped (no session)');
             }
-        } catch (err) {
-            console.log('[Anthropic] Balance scrape skipped (no session)');
         }
 
         return { name: 'Anthropic', spend, balance, subModels, subKeys };

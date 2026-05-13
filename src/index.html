@@ -342,17 +342,38 @@
             savedKeys.forEach((k, index) => {
                 let connType = k.isCookie ? 'Active Session' : 'Admin API Key';
                 if (k.isCookie && k.adminKey) connType = 'Session + Admin API Key';
+                if (!k.isCookie && k.provider === 'Anthropic') connType = k.cookieSession ? 'Admin Key + Balance Session' : 'Admin API Key (잔액 없음)';
+
+                const balanceBtn = (!k.isCookie && k.provider === 'Anthropic')
+                    ? `<button class="btn-remove" style="border-color:var(--anthropic-color);color:var(--anthropic-color);margin-right:6px;" onclick="loginAnthropicBalance(${index})">${k.cookieSession ? '잔액 갱신' : '잔액 연결'}</button>`
+                    : '';
+
                 container.innerHTML += `
                     <div class="key-item">
                         <div class="key-info">
                             <span class="key-alias"><span class="status-dot"></span>${k.provider}</span>
                             <span class="key-val">Connected · ${connType}</span>
                         </div>
-                        <button class="btn-remove" onclick="removeKey(${index})">Disconnect</button>
+                        <div style="display:flex;align-items:center;">
+                            ${balanceBtn}
+                            <button class="btn-remove" onclick="removeKey(${index})">Disconnect</button>
+                        </div>
                     </div>
                 `;
             });
             sendResize();
+        }
+
+        function loginAnthropicBalance(index) {
+            if (!window.electronAPI) return;
+            window.electronAPI.authenticateProvider('Anthropic', 'Anthropic').then(result => {
+                if (result && result.isCookie) {
+                    savedKeys[index].cookieSession = true;
+                    window.electronAPI.saveKeys(savedKeys);
+                    renderKeys();
+                    refreshData();
+                }
+            });
         }
 
         function onProviderChange(value) {
