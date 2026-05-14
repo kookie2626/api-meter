@@ -710,8 +710,15 @@ ipcMain.handle('hide-app', () => {
 });
 
 ipcMain.handle('resize-window', (event, width, height) => {
-    if (mb.window) {
-        mb.window.setContentSize(Math.ceil(width), Math.ceil(height));
+    if (!mb.window) return;
+    mb.window.setContentSize(Math.ceil(width), Math.ceil(height));
+    // 크기 변경 후 트레이 아이콘 기준으로 위치 재고정
+    if (mb.tray) {
+        const trayBounds = mb.tray.getBounds();
+        const winBounds = mb.window.getBounds();
+        const x = Math.round(trayBounds.x + trayBounds.width / 2 - winBounds.width / 2);
+        const y = trayBounds.y + trayBounds.height + 4;
+        mb.window.setPosition(x, y, false);
     }
 });
 
