@@ -43,6 +43,19 @@ mb.on('ready', () => {
         mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
 
+    mb.on('show', () => {
+        if (!isWindows && mb.window) {
+            mb.window.setAlwaysOnTop(true, 'torn-off-menu');
+            mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        }
+    });
+
+    mb.on('hide', () => {
+        if (!isWindows && mb.window) {
+            mb.window.setAlwaysOnTop(false);
+        }
+    });
+
     // 자동 새로고침 시작
     startAutoRefresh();
 
