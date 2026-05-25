@@ -7,9 +7,12 @@ const fs = require('fs');
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
 
 const isWindows = process.platform === 'win32';
+const isLinux = process.platform === 'linux';
 const trayIcon = isWindows
     ? path.join(__dirname, '../assets/icon.ico')
-    : path.join(__dirname, '../assets/iconTemplate.png');
+    : isLinux
+        ? path.join(__dirname, '../assets/icon.png')
+        : path.join(__dirname, '../assets/iconTemplate.png');
 
 const mb = menubar({
     index: `file://${__dirname}/index.html`,
@@ -24,8 +27,8 @@ const mb = menubar({
         },
         resizable: false,
         frame: false,
-        transparent: !isWindows,
-        backgroundColor: isWindows ? '#1a1a2e' : undefined
+        transparent: !isWindows && !isLinux,
+        backgroundColor: (isWindows || isLinux) ? '#1a1a2e' : undefined
     },
     preloadWindow: true
 });
@@ -33,25 +36,25 @@ const mb = menubar({
 mb.on('ready', () => {
     console.log('Menubar app is ready.');
 
-    // Windows: 작업표시줄에 앱 아이콘 표시 방지 (트레이 전용)
-    if (isWindows && mb.window) {
+    // Windows / Linux: 작업표시줄에 앱 아이콘 표시 방지 (트레이 전용)
+    if ((isWindows || isLinux) && mb.window) {
         mb.window.setSkipTaskbar(true);
     }
 
     // macOS: 어떤 데스크톱(Space)에서 클릭해도 현재 Space에서 팝업 표시
-    if (!isWindows && mb.window) {
+    if (!isWindows && !isLinux && mb.window) {
         mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
 
     mb.on('show', () => {
-        if (!isWindows && mb.window) {
+        if (!isWindows && !isLinux && mb.window) {
             mb.window.setAlwaysOnTop(true, 'torn-off-menu');
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         }
     });
 
     mb.on('hide', () => {
-        if (!isWindows && mb.window) {
+        if (!isWindows && !isLinux && mb.window) {
             mb.window.setAlwaysOnTop(false);
         }
     });
@@ -725,12 +728,17 @@ ipcMain.handle('hide-app', () => {
 ipcMain.handle('resize-window', (event, width, height) => {
     if (!mb.window) return;
     mb.window.setContentSize(Math.ceil(width), Math.ceil(height));
-    // 크기 변경 후 트레이 아이콘 기준으로 위치 재고정
     if (mb.tray) {
+        const { screen } = require('electron');
         const trayBounds = mb.tray.getBounds();
         const winBounds = mb.window.getBounds();
+        const display = screen.getDisplayNearestPoint({ x: trayBounds.x, y: trayBounds.y });
+        const screenHeight = display.bounds.height + display.bounds.y;
         const x = Math.round(trayBounds.x + trayBounds.width / 2 - winBounds.width / 2);
-        const y = trayBounds.y + trayBounds.height + 4;
+        // 작업표시줄이 하단(Windows 기본)이면 트레이 위에, 상단(macOS)이면 트레이 아래에 배치
+        const y = trayBounds.y > screenHeight / 2
+            ? trayBounds.y - winBounds.height - 4
+            : trayBounds.y + trayBounds.height + 4;
         mb.window.setPosition(x, y, false);
     }
 });

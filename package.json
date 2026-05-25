@@ -13,7 +13,8 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
   },
   "build": {
     "appId": "com.keunlee.api-meter",
@@ -44,6 +45,14 @@
         }
       ],
       "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
     },
     "nsis": {
       "oneClick": true,
