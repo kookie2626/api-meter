@@ -1,6 +1,6 @@
 # API Meter 📊
 
-A lightweight menubar (macOS) / system tray (Windows) app that tracks your AI API usage and costs in real time.
+A lightweight menubar (macOS) / system tray (Windows / Linux) app that tracks your AI API usage and costs in real time.
 
 Never get surprised by unexpected API bills again!
 
@@ -71,6 +71,25 @@ curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh 
 2. Download `API Meter Setup x.x.x.exe` (installer) or `API Meter x.x.x.exe` (portable)
 3. Run the installer — the app appears in the system tray
 
+### Linux (Ubuntu)
+
+**Option 1 — AppImage (no install required)**
+```bash
+chmod +x "API Meter-x.x.x.AppImage"
+./"API Meter-x.x.x.AppImage"
+```
+
+**Option 2 — deb package**
+```bash
+sudo dpkg -i api-meter_x.x.x_amd64.deb
+```
+
+> On Ubuntu with GNOME, the system tray requires the AppIndicator extension:
+> ```bash
+> sudo apt install gnome-shell-extension-appindicator
+> ```
+> Log out and back in after installing.
+
 ## 🛠️ Development
 
 Requires [Node.js](https://nodejs.org/).
@@ -84,8 +103,9 @@ npm start
 
 **Build for release:**
 ```bash
-npm run dist:mac   # → .dmg + .zip
-npm run dist:win   # → .exe installer + portable (run on Windows)
+npm run dist:mac   # → .dmg + .zip (macOS)
+npm run dist:win   # → .exe installer + portable (Windows)
+npm run dist:linux # → .AppImage + .deb (Linux, run on Linux)
 ```
 
 > Releases are built automatically via GitHub Actions when a version tag (`v*`) is pushed.
