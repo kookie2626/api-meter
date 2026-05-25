@@ -57,7 +57,9 @@ jobs:
         run: npm ci
 
       - name: Install Linux build dependencies
-        run: sudo apt-get install -y rpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools fakeroot rpm
 
       - name: Build Linux
         env:
