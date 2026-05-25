@@ -3,6 +3,10 @@
   "productName": "API Meter",
   "version": "1.3.8",
   "description": "Menu Bar / System Tray API Meter",
+  "author": {
+    "name": "Keun Lee",
+    "email": "keunlee726@gmail.com"
+  },
   "main": "src/main.js",
   "repository": {
     "type": "git",
