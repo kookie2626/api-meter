@@ -52,23 +52,45 @@ mb.on('ready', () => {
         }
     });
 
-    // window.show() 이후 포커스를 명시적으로 잡아줌 → blur 이벤트가 정상 발생하게 함
+    // blur 이벤트가 macOS에서 안 터지는 경우를 대비해 isFocused() 폴링으로 클릭 아웃사이드 감지
+    let focusWatchInterval = null;
+
     mb.on('after-show', () => {
-        if (mb.window && !mb.window.isDestroyed()) {
-            mb.window.focus();
-        }
+        if (mb.window && !mb.window.isDestroyed()) mb.window.focus();
+
+        if (focusWatchInterval) clearInterval(focusWatchInterval);
+
+        // focus()가 반영될 때까지 잠시 대기 후 폴링 시작
+        setTimeout(() => {
+            let wasEverFocused = false;
+            focusWatchInterval = setInterval(() => {
+                if (!mb.window || mb.window.isDestroyed() || !mb.window.isVisible()) {
+                    clearInterval(focusWatchInterval);
+                    focusWatchInterval = null;
+                    return;
+                }
+                const focused = mb.window.isFocused();
+                if (focused) {
+                    wasEverFocused = true;
+                } else if (wasEverFocused) {
+                    const hasVisibleAuthWindow = BrowserWindow.getAllWindows()
+                        .some(w => w !== mb.window && !w.isDestroyed() && w.isVisible());
+                    if (!hasVisibleAuthWindow) {
+                        clearInterval(focusWatchInterval);
+                        focusWatchInterval = null;
+                        mb.hideWindow();
+                    }
+                }
+            }, 150);
+        }, 300);
     });
 
-    // blur 이벤트로 클릭 아웃사이드 닫기
-    if (mb.window) {
-        mb.window.on('blur', () => {
-            const hasVisibleAuthWindow = BrowserWindow.getAllWindows()
-                .some(w => w !== mb.window && !w.isDestroyed() && w.isVisible());
-            if (!hasVisibleAuthWindow) {
-                mb.hideWindow();
-            }
-        });
-    }
+    mb.on('hide', () => {
+        if (focusWatchInterval) {
+            clearInterval(focusWatchInterval);
+            focusWatchInterval = null;
+        }
+    });
 
     // 자동 새로고침 시작
     startAutoRefresh();
