@@ -41,6 +41,26 @@ mb.on('ready', () => {
         mb.window.setSkipTaskbar(true);
     }
 
+    // 투명 오버레이 창: 팝업 바깥 클릭 감지용 (macOS only)
+    // blur 이벤트는 LSUIElement 앱에서 신뢰할 수 없어 오버레이로 대체
+    let overlayWin = null;
+    if (!isWindows && !isLinux) {
+        const { screen } = require('electron');
+        const bounds = screen.getPrimaryDisplay().bounds;
+        overlayWin = new BrowserWindow({
+            x: bounds.x, y: bounds.y,
+            width: bounds.width, height: bounds.height,
+            transparent: true, frame: false, hasShadow: false,
+            focusable: false, skipTaskbar: true, show: false,
+            webPreferences: {
+                preload: path.join(__dirname, 'capture-preload.js'),
+                nodeIntegration: false, contextIsolation: true
+            }
+        });
+        overlayWin.loadFile(path.join(__dirname, 'capture.html'));
+        overlayWin.setAlwaysOnTop(true, 'floating'); // level 3, 팝업(status=25) 아래
+    }
+
     let focusLostTimeout = null;
 
     mb.on('show', () => {
@@ -50,10 +70,14 @@ mb.on('ready', () => {
     mb.on('after-show', () => {
         if (!isWindows && !isLinux && mb.window) {
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-            mb.window.setAlwaysOnTop(true, 'torn-off-menu');
-            // LSUIElement 앱은 show()만으로는 key window가 안 됨 → app.focus로 활성화 후 window.focus
-            app.focus({ steal: true });
-            mb.window.focus();
+            mb.window.setAlwaysOnTop(true, 'status'); // level 25, 오버레이 위
+            if (overlayWin && !overlayWin.isDestroyed()) overlayWin.show();
+        }
+    });
+
+    mb.on('after-hide', () => {
+        if (!isWindows && !isLinux) {
+            if (overlayWin && !overlayWin.isDestroyed()) overlayWin.hide();
         }
     });
 
@@ -63,8 +87,7 @@ mb.on('ready', () => {
         }
     });
 
-    // menubar emits 'focus-lost' (not hideWindow) when the window is alwaysOnTop and loses focus.
-    // 150ms delay lets the tray-click handler run first so the toggle still works.
+    // 메뉴바 클릭 등 focus 이벤트로 닫히는 경우 대비 (보조)
     mb.on('focus-lost', () => {
         if (focusLostTimeout) clearTimeout(focusLostTimeout);
         focusLostTimeout = setTimeout(() => {
@@ -735,6 +758,10 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
 // =============================================
 // 윈도우 관리
 // =============================================
+ipcMain.on('click-outside', () => {
+    mb.hideWindow();
+});
+
 ipcMain.handle('hide-app', () => {
     mb.hideWindow();
 });
