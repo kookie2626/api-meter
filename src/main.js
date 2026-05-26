@@ -43,13 +43,16 @@ mb.on('ready', () => {
 
     // 투명 오버레이 창: 팝업 바깥 클릭 감지용 (macOS only)
     // blur 이벤트는 LSUIElement 앱에서 신뢰할 수 없어 오버레이로 대체
-    let overlayWin = null;
     if (!isWindows && !isLinux) {
         const { screen } = require('electron');
-        const bounds = screen.getPrimaryDisplay().bounds;
+        const displays = screen.getAllDisplays();
+        const minX = Math.min(...displays.map(d => d.bounds.x));
+        const minY = Math.min(...displays.map(d => d.bounds.y));
+        const maxX = Math.max(...displays.map(d => d.bounds.x + d.bounds.width));
+        const maxY = Math.max(...displays.map(d => d.bounds.y + d.bounds.height));
         overlayWin = new BrowserWindow({
-            x: bounds.x, y: bounds.y,
-            width: bounds.width, height: bounds.height,
+            x: minX, y: minY,
+            width: maxX - minX, height: maxY - minY,
             transparent: true, frame: false, hasShadow: false,
             skipTaskbar: true, show: false,
             webPreferences: {
@@ -71,7 +74,10 @@ mb.on('ready', () => {
         if (!isWindows && !isLinux && mb.window) {
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
             mb.window.setAlwaysOnTop(true, 'torn-off-menu'); // level 3
-            if (overlayWin && !overlayWin.isDestroyed()) overlayWin.showInactive(); // key window 안 바꾸도록
+            if (overlayWin && !overlayWin.isDestroyed()) {
+                overlayWin.setIgnoreMouseEvents(false);
+                overlayWin.showInactive(); // key window 안 바꾸도록
+            }
             mb.window.moveTop(); // 같은 level 3 내에서 팝업이 오버레이 위에 오도록
         }
     });
@@ -139,6 +145,7 @@ function extractToken(raw) {
 // 캐시 및 자동 새로고침
 let lastUsageData = null;
 let autoRefreshTimer = null;
+let overlayWin = null;
 
 function startAutoRefresh() {
     if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
@@ -316,14 +323,14 @@ async function fetchAllData() {
 
         // Legacy: session-based browser scraping
         if (keyObj.isCookie) {
+            let win = null;
             try {
-                const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+                win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
                 console.log('[Anthropic] Fetching via session...');
                 await win.loadURL('https://console.anthropic.com/settings/billing');
                 await new Promise(r => setTimeout(r, 3000));
 
                 const text = await win.webContents.executeJavaScript('document.body.innerText');
-                if (!win.isDestroyed()) win.close();
 
                 const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
                                      text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
@@ -350,6 +357,8 @@ async function fetchAllData() {
                 }
             } catch (err) {
                 console.error('[Anthropic] Error:', err.message);
+            } finally {
+                if (win && !win.isDestroyed()) win.close();
             }
             return { name: 'Anthropic', spend, balance };
         }
@@ -466,12 +475,12 @@ async function fetchAllData() {
 
         // 잔액: 세션 쿠키가 있을 때만 스크래핑 시도
         if (keyObj.isCookie || keyObj.cookieSession) {
+            let win = null;
             try {
-                const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+                win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
                 await win.loadURL('https://console.anthropic.com/settings/billing');
                 await new Promise(r => setTimeout(r, 3000));
                 const text = await win.webContents.executeJavaScript('document.body.innerText');
-                if (!win.isDestroyed()) win.close();
 
                 const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
                                      text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
@@ -483,6 +492,8 @@ async function fetchAllData() {
                 }
             } catch (err) {
                 console.log('[Anthropic] Balance scrape skipped (no session)');
+            } finally {
+                if (win && !win.isDestroyed()) win.close();
             }
         }
 
@@ -491,14 +502,14 @@ async function fetchAllData() {
 
     async function fetchGemini(keyObj) {
         let spend = 0;
+        let win = null;
         try {
-            const win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+            win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
             console.log('[Gemini] Fetching...');
             await win.loadURL('https://aistudio.google.com/app/spend');
             await new Promise(r => setTimeout(r, 4000));
 
             const text = await win.webContents.executeJavaScript('document.body.innerText');
-            if (!win.isDestroyed()) win.close();
 
             const lines = text.split('\n');
             for (let i = 0; i < lines.length; i++) {
@@ -521,6 +532,8 @@ async function fetchAllData() {
             console.log(`[Gemini] Spend: $${spend}`);
         } catch (err) {
             console.error('[Gemini] Error:', err.message);
+        } finally {
+            if (win && !win.isDestroyed()) win.close();
         }
         return { name: 'Gemini', spend, balance: null };
     }
@@ -760,6 +773,7 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
 // 윈도우 관리
 // =============================================
 ipcMain.on('click-outside', () => {
+    if (overlayWin && !overlayWin.isDestroyed()) overlayWin.setIgnoreMouseEvents(true);
     mb.hideWindow();
 });
 
