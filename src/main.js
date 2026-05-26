@@ -30,8 +30,7 @@ const mb = menubar({
         transparent: !isWindows && !isLinux,
         backgroundColor: (isWindows || isLinux) ? '#1a1a2e' : undefined
     },
-    preloadWindow: true,
-    hideOnClickOutside: false
+    preloadWindow: true
 });
 
 mb.on('ready', () => {
@@ -49,58 +48,16 @@ mb.on('ready', () => {
 
     mb.on('show', () => {
         if (!isWindows && !isLinux && mb.window) {
+            mb.window.setAlwaysOnTop(true, 'torn-off-menu');
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         }
     });
 
-    // 팝업 바깥 클릭 감지: 투명 캡처 창을 팝업 뒤에 깔고 mousedown으로 직접 감지
-    let captureWin = null;
-
-    function destroyCaptureWin() {
-        if (captureWin && !captureWin.isDestroyed()) {
-            captureWin.close();
-        }
-        captureWin = null;
-    }
-
-    mb.on('after-show', () => {
-        if (!mb.window || mb.window.isDestroyed()) return;
-
-        // 팝업을 항상 캡처 창 위에 유지
-        mb.window.setAlwaysOnTop(true, 'pop-up-menu');
-        mb.window.focus();
-
-        destroyCaptureWin();
-
-        const { screen } = require('electron');
-        const display = screen.getDisplayNearestPoint(mb.tray.getBounds());
-        captureWin = new BrowserWindow({
-            x: display.bounds.x,
-            y: display.bounds.y,
-            width: display.bounds.width,
-            height: display.bounds.height,
-            transparent: true,
-            frame: false,
-            skipTaskbar: true,
-            webPreferences: {
-                preload: path.join(__dirname, 'capture-preload.js'),
-                nodeIntegration: false,
-                contextIsolation: true
-            }
-        });
-        captureWin.loadFile(path.join(__dirname, 'capture.html'));
-        captureWin.showInactive();
-        captureWin.on('closed', () => { captureWin = null; });
-    });
-
     mb.on('hide', () => {
-        if (mb.window && !mb.window.isDestroyed()) {
+        if (!isWindows && !isLinux && mb.window) {
             mb.window.setAlwaysOnTop(false);
         }
-        destroyCaptureWin();
     });
-
-    ipcMain.on('click-outside', () => mb.hideWindow());
 
     // 자동 새로고침 시작
     startAutoRefresh();
