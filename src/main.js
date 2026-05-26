@@ -41,18 +41,18 @@ mb.on('ready', () => {
         mb.window.setSkipTaskbar(true);
     }
 
-    // macOS: 어떤 데스크톱(Space)에서 클릭해도 현재 Space에서 팝업 표시
-    if (!isWindows && !isLinux && mb.window) {
-        mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    }
-
     let focusLostTimeout = null;
 
     mb.on('show', () => {
         if (focusLostTimeout) { clearTimeout(focusLostTimeout); focusLostTimeout = null; }
+    });
+
+    mb.on('after-show', () => {
         if (!isWindows && !isLinux && mb.window) {
-            mb.window.setAlwaysOnTop(true, 'torn-off-menu');
+            // Set after show so the window gets proper focus first (ensures blur fires on click-outside)
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+            mb.window.setAlwaysOnTop(true, 'torn-off-menu');
+            mb.window.focus();
         }
     });
 
