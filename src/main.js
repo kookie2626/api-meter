@@ -70,8 +70,9 @@ mb.on('ready', () => {
     mb.on('after-show', () => {
         if (!isWindows && !isLinux && mb.window) {
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-            mb.window.setAlwaysOnTop(true, 'status'); // level 25, 오버레이 위
+            mb.window.setAlwaysOnTop(true, 'torn-off-menu'); // level 3
             if (overlayWin && !overlayWin.isDestroyed()) overlayWin.show();
+            mb.window.moveTop(); // 같은 level 3 내에서 팝업이 오버레이 위에 오도록
         }
     });
 
