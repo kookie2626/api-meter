@@ -49,9 +49,10 @@ mb.on('ready', () => {
 
     mb.on('after-show', () => {
         if (!isWindows && !isLinux && mb.window) {
-            // Set after show so the window gets proper focus first (ensures blur fires on click-outside)
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
             mb.window.setAlwaysOnTop(true, 'torn-off-menu');
+            // LSUIElement 앱은 show()만으로는 key window가 안 됨 → app.focus로 활성화 후 window.focus
+            app.focus({ steal: true });
             mb.window.focus();
         }
     });
