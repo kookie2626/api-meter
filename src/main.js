@@ -30,7 +30,8 @@ const mb = menubar({
         transparent: !isWindows && !isLinux,
         backgroundColor: (isWindows || isLinux) ? '#1a1a2e' : undefined
     },
-    preloadWindow: true
+    preloadWindow: true,
+    hideOnClickOutside: false
 });
 
 mb.on('ready', () => {
@@ -52,45 +53,54 @@ mb.on('ready', () => {
         }
     });
 
-    // blur 이벤트가 macOS에서 안 터지는 경우를 대비해 isFocused() 폴링으로 클릭 아웃사이드 감지
-    let focusWatchInterval = null;
+    // 팝업 바깥 클릭 감지: 투명 캡처 창을 팝업 뒤에 깔고 mousedown으로 직접 감지
+    let captureWin = null;
+
+    function destroyCaptureWin() {
+        if (captureWin && !captureWin.isDestroyed()) {
+            captureWin.close();
+        }
+        captureWin = null;
+    }
 
     mb.on('after-show', () => {
-        if (mb.window && !mb.window.isDestroyed()) mb.window.focus();
+        if (!mb.window || mb.window.isDestroyed()) return;
 
-        if (focusWatchInterval) clearInterval(focusWatchInterval);
+        // 팝업을 항상 캡처 창 위에 유지
+        mb.window.setAlwaysOnTop(true, 'pop-up-menu');
+        mb.window.focus();
 
-        // focus()가 반영될 때까지 잠시 대기 후 폴링 시작
-        setTimeout(() => {
-            let wasEverFocused = false;
-            focusWatchInterval = setInterval(() => {
-                if (!mb.window || mb.window.isDestroyed() || !mb.window.isVisible()) {
-                    clearInterval(focusWatchInterval);
-                    focusWatchInterval = null;
-                    return;
-                }
-                const focused = mb.window.isFocused();
-                if (focused) {
-                    wasEverFocused = true;
-                } else if (wasEverFocused) {
-                    const hasVisibleAuthWindow = BrowserWindow.getAllWindows()
-                        .some(w => w !== mb.window && !w.isDestroyed() && w.isVisible());
-                    if (!hasVisibleAuthWindow) {
-                        clearInterval(focusWatchInterval);
-                        focusWatchInterval = null;
-                        mb.hideWindow();
-                    }
-                }
-            }, 150);
-        }, 300);
+        destroyCaptureWin();
+
+        const { screen } = require('electron');
+        const display = screen.getDisplayNearestPoint(mb.tray.getBounds());
+        captureWin = new BrowserWindow({
+            x: display.bounds.x,
+            y: display.bounds.y,
+            width: display.bounds.width,
+            height: display.bounds.height,
+            transparent: true,
+            frame: false,
+            skipTaskbar: true,
+            webPreferences: {
+                preload: path.join(__dirname, 'capture-preload.js'),
+                nodeIntegration: false,
+                contextIsolation: true
+            }
+        });
+        captureWin.loadFile(path.join(__dirname, 'capture.html'));
+        captureWin.showInactive();
+        captureWin.on('closed', () => { captureWin = null; });
     });
 
     mb.on('hide', () => {
-        if (focusWatchInterval) {
-            clearInterval(focusWatchInterval);
-            focusWatchInterval = null;
+        if (mb.window && !mb.window.isDestroyed()) {
+            mb.window.setAlwaysOnTop(false);
         }
+        destroyCaptureWin();
     });
+
+    ipcMain.on('click-outside', () => mb.hideWindow());
 
     // 자동 새로고침 시작
     startAutoRefresh();
