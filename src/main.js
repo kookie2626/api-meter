@@ -58,7 +58,7 @@ mb.on('ready', () => {
             }
         });
         overlayWin.loadFile(path.join(__dirname, 'capture.html'));
-        overlayWin.setAlwaysOnTop(true, 'floating'); // level 3, 팝업(status=25) 아래
+        overlayWin.setAlwaysOnTop(true, 'floating'); // level 3, 팝업과 같은 레벨(moveTop으로 순서 제어)
     }
 
     let focusLostTimeout = null;
@@ -71,7 +71,7 @@ mb.on('ready', () => {
         if (!isWindows && !isLinux && mb.window) {
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
             mb.window.setAlwaysOnTop(true, 'torn-off-menu'); // level 3
-            if (overlayWin && !overlayWin.isDestroyed()) overlayWin.show();
+            if (overlayWin && !overlayWin.isDestroyed()) overlayWin.showInactive(); // key window 안 바꾸도록
             mb.window.moveTop(); // 같은 level 3 내에서 팝업이 오버레이 위에 오도록
         }
     });
