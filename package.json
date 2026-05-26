@@ -1,7 +1,7 @@
 {
   "name": "api-meter",
   "productName": "API Meter",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "Menu Bar / System Tray API Meter",
   "author": {
     "name": "Keun Lee",
@@ -41,19 +41,33 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.ico"
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.png",
       "category": "Utility"
@@ -79,7 +93,7 @@
     "pg": "^8.20.0"
   },
   "devDependencies": {
-    "electron": "^34.5.8",
+    "electron": "^42.2.0",
     "electron-builder": "^26.8.1",
     "png-to-ico": "^3.0.1"
   }
