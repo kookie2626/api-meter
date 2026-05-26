@@ -51,7 +51,7 @@ mb.on('ready', () => {
             x: bounds.x, y: bounds.y,
             width: bounds.width, height: bounds.height,
             transparent: true, frame: false, hasShadow: false,
-            focusable: false, skipTaskbar: true, show: false,
+            skipTaskbar: true, show: false,
             webPreferences: {
                 preload: path.join(__dirname, 'capture-preload.js'),
                 nodeIntegration: false, contextIsolation: true
