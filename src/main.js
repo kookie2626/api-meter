@@ -46,10 +46,13 @@ mb.on('ready', () => {
         mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
 
+    let focusLostTimeout = null;
+
     mb.on('show', () => {
+        if (focusLostTimeout) { clearTimeout(focusLostTimeout); focusLostTimeout = null; }
         if (!isWindows && !isLinux && mb.window) {
             mb.window.setAlwaysOnTop(true, 'torn-off-menu');
-            mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+            mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
         }
     });
 
@@ -57,6 +60,16 @@ mb.on('ready', () => {
         if (!isWindows && !isLinux && mb.window) {
             mb.window.setAlwaysOnTop(false);
         }
+    });
+
+    // menubar emits 'focus-lost' (not hideWindow) when the window is alwaysOnTop and loses focus.
+    // 150ms delay lets the tray-click handler run first so the toggle still works.
+    mb.on('focus-lost', () => {
+        if (focusLostTimeout) clearTimeout(focusLostTimeout);
+        focusLostTimeout = setTimeout(() => {
+            focusLostTimeout = null;
+            mb.hideWindow();
+        }, 150);
     });
 
     // 자동 새로고침 시작
