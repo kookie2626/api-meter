@@ -52,7 +52,14 @@ mb.on('ready', () => {
         }
     });
 
-    // blur 이벤트로 클릭 아웃사이드 닫기 (menubar 패키지 백업용)
+    // window.show() 이후 포커스를 명시적으로 잡아줌 → blur 이벤트가 정상 발생하게 함
+    mb.on('after-show', () => {
+        if (mb.window && !mb.window.isDestroyed()) {
+            mb.window.focus();
+        }
+    });
+
+    // blur 이벤트로 클릭 아웃사이드 닫기
     if (mb.window) {
         mb.window.on('blur', () => {
             const hasVisibleAuthWindow = BrowserWindow.getAllWindows()
