@@ -48,16 +48,20 @@ mb.on('ready', () => {
 
     mb.on('show', () => {
         if (!isWindows && !isLinux && mb.window) {
-            mb.window.setAlwaysOnTop(true, 'torn-off-menu');
             mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
         }
     });
 
-    mb.on('hide', () => {
-        if (!isWindows && !isLinux && mb.window) {
-            mb.window.setAlwaysOnTop(false);
-        }
-    });
+    // blur 이벤트로 클릭 아웃사이드 닫기 (menubar 패키지 백업용)
+    if (mb.window) {
+        mb.window.on('blur', () => {
+            const hasVisibleAuthWindow = BrowserWindow.getAllWindows()
+                .some(w => w !== mb.window && !w.isDestroyed() && w.isVisible());
+            if (!hasVisibleAuthWindow) {
+                mb.hideWindow();
+            }
+        });
+    }
 
     // 자동 새로고침 시작
     startAutoRefresh();
