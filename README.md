@@ -68,18 +68,32 @@ curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh 
 
 ### Windows
 
+**One-line install** (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/kookie2626/api-meter/main/install.ps1 | iex
+```
+
+**Manual**
 1. Go to the [Releases page](../../releases/latest)
 2. Download `API-Meter-Setup-x.x.x.exe` (installer) or `API-Meter-x.x.x.exe` (portable)
 3. Run the installer — the app appears in the system tray
 
 ### Linux (Ubuntu / Debian)
 
-**AppImage (recommended — no install required)**
+**One-line install**
+```bash
+curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
+```
+Ubuntu/Debian: installs the `.deb` package. Other distros: downloads the AppImage.
+
+**Manual**
+
+AppImage (no install required):
 ```bash
 chmod +x "API-Meter-x.x.x.AppImage" && ./"API-Meter-x.x.x.AppImage"
 ```
 
-**deb package**
+deb package:
 ```bash
 sudo dpkg -i api-meter_x.x.x_amd64.deb
 ```
