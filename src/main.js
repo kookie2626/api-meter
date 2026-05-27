@@ -511,6 +511,53 @@ async function fetchAllData() {
         return { name: 'Anthropic', spend, balance, subModels, subKeys };
     }
 
+    async function fetchOllama(keyObj) {
+        let plan = null, sessionPct = 0, weeklyPct = 0, sessionReset = null, weeklyReset = null;
+        let win = null;
+        try {
+            win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
+            console.log('[Ollama] Fetching settings page...');
+            await win.loadURL('https://ollama.com/settings');
+            await new Promise(r => setTimeout(r, 3000));
+
+            const html = await win.webContents.executeJavaScript('document.documentElement.innerHTML');
+            const text = await win.webContents.executeJavaScript('document.body.innerText');
+
+            // Plan: "Cloud Usage <span class="text-xs">pro</span>"
+            const planMatch = html.match(/Cloud Usage[\s\S]*?<span[^>]*class="[^"]*text-xs[^"]*"[^>]*>([^<]+)<\/span>/i);
+            if (planMatch) plan = planMatch[1].trim().toLowerCase();
+
+            // % used 추출 헬퍼: "X% used" 또는 CSS "width: X%" 두 방식 모두 시도
+            function extractPct(section) {
+                const m1 = section.match(/([\d.]+)%\s*used/i);
+                if (m1) return parseFloat(m1[1]);
+                const m2 = section.match(/width:\s*([\d.]+)%/i);
+                if (m2) return parseFloat(m2[1]);
+                return 0;
+            }
+
+            // Session / Hourly 섹션 — 레이블과 Weekly 사이의 텍스트만 추출
+            const sessionSectionMatch = text.match(/(?:Session|Hourly) usage([\s\S]*?)(?:Weekly usage|$)/i);
+            if (sessionSectionMatch) sessionPct = extractPct(sessionSectionMatch[1]);
+
+            const weeklySectionMatch = text.match(/Weekly usage([\s\S]*?)(?:\n\n|$)/i);
+            if (weeklySectionMatch) weeklyPct = extractPct(weeklySectionMatch[1]);
+
+            // Reset times: Session/Weekly 섹션 안의 data-time만 추출
+            const sessionHtmlMatch = html.match(/(?:Session|Hourly) usage[\s\S]*?data-time="([^"]+)"/i);
+            if (sessionHtmlMatch) sessionReset = sessionHtmlMatch[1];
+            const weeklyHtmlMatch = html.match(/Weekly usage[\s\S]*?data-time="([^"]+)"/i);
+            if (weeklyHtmlMatch) weeklyReset = weeklyHtmlMatch[1];
+
+            console.log(`[Ollama] Plan: ${plan}, Session: ${sessionPct}%, Weekly: ${weeklyPct}%`);
+        } catch (err) {
+            console.error('[Ollama] Error:', err.message);
+        } finally {
+            if (win && !win.isDestroyed()) win.close();
+        }
+        return { name: 'Ollama', spend: 0, isOllamaCloud: true, plan, sessionPct, weeklyPct, sessionReset, weeklyReset };
+    }
+
     async function fetchGemini(keyObj) {
         let spend = 0;
         let win = null;
@@ -554,6 +601,7 @@ async function fetchAllData() {
         if (keyObj.provider === 'OpenAI') return fetchOpenAI(keyObj);
         if (keyObj.provider === 'Anthropic') return fetchAnthropic(keyObj);
         if (keyObj.provider === 'Gemini') return fetchGemini(keyObj);
+        if (keyObj.provider === 'Ollama') return fetchOllama(keyObj);
         return Promise.resolve({ name: keyObj.provider, spend: 0, balance: null });
     });
 
@@ -568,11 +616,24 @@ async function fetchAllData() {
         if (r.balance !== null) model.balance = r.balance;
         if (r.subModels && r.subModels.length > 0) model.subModels = r.subModels;
         if (r.subKeys && r.subKeys.length > 0) model.subKeys = r.subKeys;
+        if (r.isOllamaCloud) {
+            model.isOllamaCloud = true;
+            model.plan = r.plan;
+            model.sessionPct = r.sessionPct;
+            model.weeklyPct = r.weeklyPct;
+            model.sessionReset = r.sessionReset;
+            model.weeklyReset = r.weeklyReset;
+        }
         data.models.push(model);
-        data.total_spend += r.spend;
+        if (!r.isOllamaCloud) data.total_spend += r.spend;
     });
 
-    data.models.sort((a, b) => b.spend - a.spend);
+    // Ollama는 spend 없으므로 뒤로, 나머지는 spend 내림차순
+    data.models.sort((a, b) => {
+        if (a.isOllamaCloud) return 1;
+        if (b.isOllamaCloud) return -1;
+        return b.spend - a.spend;
+    });
     return data;
 }
 
@@ -764,6 +825,46 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
                     resolved = true;
                     resolve(null);
                 }
+            });
+            return;
+        } else if (provider === 'Ollama') {
+            // /settings 로 직접 이동 → 미로그인 시 /login 으로 리디렉트됨
+            // 이미 로그인된 경우 즉시 /settings 로드 → 첫 navigate 완료 후 감지
+            let initialNavDone = false;
+
+            authWin.webContents.on('did-navigate', (e, url) => {
+                console.log(`[Auth] Ollama navigate: ${url}`);
+                if (!initialNavDone) { initialNavDone = true; return; } // 첫 이동(→login) 무시
+                if (resolved) return;
+                if (url.startsWith('https://ollama.com') &&
+                    url.includes('/settings') &&
+                    !url.includes('/login') &&
+                    !url.includes('/signin')) {
+                    resolved = true;
+                    console.log(`[Auth] Ollama login SUCCESS via navigate!`);
+                    setTimeout(() => { if (!authWin.isDestroyed()) authWin.close(); }, 300);
+                    resolve({ provider, alias, token: 'session_active', isCookie: true });
+                }
+            });
+
+            // 백업: 이미 로그인된 상태면 리디렉트 없이 /settings 바로 로드
+            authWin.webContents.on('did-finish-load', () => {
+                if (resolved || !initialNavDone) return;
+                try {
+                    const url = authWin.webContents.getURL();
+                    if (url.includes('/settings') && !url.includes('/login') && !url.includes('/signin')) {
+                        resolved = true;
+                        console.log(`[Auth] Ollama already logged in!`);
+                        setTimeout(() => { if (!authWin.isDestroyed()) authWin.close(); }, 300);
+                        resolve({ provider, alias, token: 'session_active', isCookie: true });
+                    }
+                } catch (e) {}
+            });
+
+            authWin.loadURL('https://ollama.com/settings');
+
+            authWin.on('closed', () => {
+                if (!resolved) { resolved = true; resolve(null); }
             });
             return;
         } else {
