@@ -41,6 +41,12 @@ mb.on('ready', () => {
         mb.window.setSkipTaskbar(true);
     }
 
+    // macOS: menubar 내부가 show()를 호출하면 NSApp activate → Space 전환 발생
+    // showInactive()로 대체해 현재 Space를 유지
+    if (!isWindows && !isLinux && mb.window) {
+        mb.window.show = mb.window.showInactive.bind(mb.window);
+    }
+
     // 투명 오버레이 창: 팝업 바깥 클릭 감지용 (macOS only)
     // blur 이벤트는 LSUIElement 앱에서 신뢰할 수 없어 오버레이로 대체
     if (!isWindows && !isLinux) {
@@ -68,11 +74,14 @@ mb.on('ready', () => {
 
     mb.on('show', () => {
         if (focusLostTimeout) { clearTimeout(focusLostTimeout); focusLostTimeout = null; }
+        // window.show() 전에 설정해야 macOS가 현재 Space를 유지함
+        if (!isWindows && !isLinux && mb.window) {
+            mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+        }
     });
 
     mb.on('after-show', () => {
         if (!isWindows && !isLinux && mb.window) {
-            mb.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
             mb.window.setAlwaysOnTop(true, 'torn-off-menu'); // level 3
             if (overlayWin && !overlayWin.isDestroyed()) {
                 overlayWin.setIgnoreMouseEvents(false);
