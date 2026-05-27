@@ -68,6 +68,7 @@ mb.on('ready', () => {
         });
         overlayWin.loadFile(path.join(__dirname, 'capture.html'));
         overlayWin.setAlwaysOnTop(true, 'floating'); // level 3, 팝업과 같은 레벨(moveTop으로 순서 제어)
+        overlayWin.setVisibleOnAllWorkspaces(true, { skipTransformProcessType: true });
     }
 
     let focusLostTimeout = null;
