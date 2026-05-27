@@ -452,7 +452,7 @@
                     renderKeys();
                     refreshData();
                 }
-            });
+            }).catch(() => {});
         }
 
         function onProviderChange(value) {
@@ -517,6 +517,10 @@
                     } else {
                         alert("Login cancelled or failed to capture session.");
                     }
+                }).catch(() => {
+                    btn.textContent = 'Login & Connect';
+                    btn.style.opacity = '1';
+                    btn.style.pointerEvents = 'auto';
                 });
             }
         }

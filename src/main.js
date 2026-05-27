@@ -788,6 +788,8 @@ ipcMain.handle('resize-window', (event, width, height) => {
     if (mb.tray) {
         const { screen } = require('electron');
         const trayBounds = mb.tray.getBounds();
+        // Linux: many DEs return zero bounds for tray — skip repositioning to avoid off-screen placement
+        if (isLinux && trayBounds.width === 0 && trayBounds.height === 0) return;
         const winBounds = mb.window.getBounds();
         const display = screen.getDisplayNearestPoint({ x: trayBounds.x, y: trayBounds.y });
         const screenHeight = display.bounds.height + display.bounds.y;
