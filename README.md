@@ -6,7 +6,7 @@ Never get surprised by unexpected API bills again!
 
 ## ✨ Features
 
-- **Multi-Provider Support** — Track costs for **OpenAI**, **Anthropic (Claude)**, and **Google (Gemini)**
+- **Multi-Provider Support** — Track costs for **OpenAI**, **Anthropic (Claude)**, **Google (Gemini)**, and **Ollama Cloud**
 - **Model Breakdown** — See exactly which model (GPT-4o, Claude Sonnet, etc.) is consuming your budget
 - **API Key Breakdown** — See per-API-key cost distribution for OpenAI and Anthropic (requires Admin API key)
 - **Live Balance** — Remaining credits shown alongside monthly spend
@@ -21,6 +21,7 @@ Never get surprised by unexpected API bills again!
 | OpenAI | ✅ | ✅ | ✅ | ✅ (Admin API, optional) |
 | Anthropic | ✅ | ✅ | ✅ | ✅ (Admin API) |
 | Gemini | ❌ | ✅ | ❌ | ❌ |
+| Ollama Cloud | ❌ | ❌ | ❌ | ❌ (Session / Weekly usage % + plan) |
 
 ## 🔑 How to connect each provider
 
@@ -51,6 +52,12 @@ After connecting, click **Connect Balance** in the connected accounts list and l
 ### Gemini
 
 Click **Login & Connect** in Settings and log in to [aistudio.google.com](https://aistudio.google.com). The app reads your total monthly spend from the billing page.
+
+### Ollama Cloud
+
+Click **Login & Connect** in Settings and log in to [ollama.com](https://ollama.com). The app reads your plan (Free / Pro / Max), current session usage, and weekly usage from your account settings page.
+
+> Ollama Cloud tracks usage as a percentage of your plan's hourly and weekly limits — not as a dollar spend.
 
 ## 🚀 Installation
 
@@ -103,6 +110,7 @@ npm run dist:linux # → .AppImage + .deb (Linux, run on Linux)
 - **OpenAI** — Captures the session token from your browser login and calls the billing usage API for spend and balance. If an Admin API key is provided, additionally queries `/v1/organization/usage/completions` (grouped by `api_key_id`) to distribute costs across keys.
 - **Anthropic** — Uses the Admin API (`/v1/organizations/cost_report`, `/v1/organizations/usage_report/messages`) for accurate model costs and per-key breakdowns. Credit balance is scraped from the console billing page via an optional browser session.
 - **Gemini** — Reads total spend from the AI Studio billing page via your logged-in browser session. (Google does not provide a programmatic billing API.)
+- **Ollama Cloud** — Reads plan tier, session usage %, and weekly usage % from the ollama.com settings page via your logged-in browser session.
 
 ---
 
