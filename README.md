@@ -10,6 +10,7 @@ Never get surprised by unexpected API bills again!
 - **Model Breakdown** — See exactly which model (GPT-4o, Claude Sonnet, etc.) is consuming your budget
 - **API Key Breakdown** — See per-API-key cost distribution for OpenAI and Anthropic (requires Admin API key)
 - **Live Balance** — Remaining credits shown alongside monthly spend
+- **Auto Refresh** — Background data refresh on a configurable interval (5 min / 15 min / 30 min / 1 hour)
 - **Secure & Local** — All keys and session tokens are stored strictly on your machine. No external servers.
 - **Auto-Updates** — Built-in OTA updates via GitHub Releases
 
@@ -55,36 +56,35 @@ Click **Login & Connect** in Settings and log in to [aistudio.google.com](https:
 
 ### macOS
 
-**Option 1 — One-line install (Recommended)**
+**One-line install**
 ```bash
 curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
 ```
 
-**Option 2 — Manual**
+**Manual**
 1. Go to the [Releases page](../../releases/latest)
-2. Download `API Meter-x.x.x-arm64.dmg`
+2. Download `API-Meter-x.x.x-arm64.dmg`
 3. Open the DMG and drag **API Meter** into your Applications folder
 
 ### Windows
 
 1. Go to the [Releases page](../../releases/latest)
-2. Download `API Meter Setup x.x.x.exe` (installer) or `API Meter x.x.x.exe` (portable)
+2. Download `API-Meter-Setup-x.x.x.exe` (installer) or `API-Meter-x.x.x.exe` (portable)
 3. Run the installer — the app appears in the system tray
 
-### Linux (Ubuntu)
+### Linux (Ubuntu / Debian)
 
-**Option 1 — AppImage (no install required)**
+**AppImage (recommended — no install required)**
 ```bash
-chmod +x "API Meter-x.x.x.AppImage"
-./"API Meter-x.x.x.AppImage"
+chmod +x "API-Meter-x.x.x.AppImage" && ./"API-Meter-x.x.x.AppImage"
 ```
 
-**Option 2 — deb package**
+**deb package**
 ```bash
 sudo dpkg -i api-meter_x.x.x_amd64.deb
 ```
 
-> On Ubuntu with GNOME, the system tray requires the AppIndicator extension:
+> **GNOME users:** The system tray requires the AppIndicator extension:
 > ```bash
 > sudo apt install gnome-shell-extension-appindicator
 > ```
