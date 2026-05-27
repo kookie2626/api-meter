@@ -169,9 +169,6 @@ async function fetchAllData() {
     const settings = getSettings();
     const keys = settings.keys || [];
     
-    // 캐시가 있으면 즉시 반환하고, 백그라운드에서 갱신
-    // (첫 요청이거나 5분 이상 지났으면 동기적으로 조회)
-    
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -476,8 +473,8 @@ async function fetchAllData() {
             console.error('[Anthropic] API error:', err.message);
         }
 
-        // 잔액: 세션 쿠키가 있을 때만 스크래핑 시도
-        if (keyObj.isCookie || keyObj.cookieSession) {
+        // 잔액: cookieSession이 있을 때만 스크래핑 시도 (isCookie 경로는 위에서 이미 return)
+        if (keyObj.cookieSession) {
             let win = null;
             try {
                 win = new BrowserWindow({ show: false, webPreferences: { nodeIntegration: false } });
@@ -595,7 +592,11 @@ function getSettings() {
 }
 
 function saveSettings(settings) {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    try {
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    } catch (e) {
+        console.error('[Settings] Failed to save:', e.message);
+    }
 }
 
 ipcMain.handle('load-keys', () => {
@@ -634,7 +635,7 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
 
         if (provider === 'OpenAI') {
             // OpenAI: 격리 파티션의 모든 스토리지 초기화 후 로그인 페이지 로드
-            authWin.webContents.session.clearStorageData().then(() => {
+            const startOpenAIAuth = () => {
                 const filter = { urls: ['*://*.openai.com/*'] };
                 authWin.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
                     if (resolved) {
@@ -653,7 +654,8 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
                     callback({ requestHeaders: details.requestHeaders });
                 });
                 authWin.loadURL('https://platform.openai.com/login');
-            });
+            };
+            authWin.webContents.session.clearStorageData().then(startOpenAIAuth).catch(startOpenAIAuth);
             
         } else if (provider === 'Anthropic') {
             // Anthropic: 페이지 타이틀 + URL 폴링으로 로그인 완료 감지
