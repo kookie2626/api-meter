@@ -77,13 +77,15 @@ Or download `API-Meter-Setup-x.x.x.exe` from the [Releases page](../../releases/
 ```bash
 curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
 ```
-Ubuntu/Debian: installs the `.deb` package automatically. Other distros: downloads the AppImage.
+Ubuntu/Debian: installs the `.deb` package automatically. Other distros: downloads the AppImage to `~/Applications/`.
+
+After installing, launch **API Meter** from your application menu or run `api-meter` in the terminal. The icon will appear in the system tray.
 
 > **GNOME users:** The system tray requires the AppIndicator extension:
 > ```bash
 > sudo apt install gnome-shell-extension-appindicator
 > ```
-> Log out and back in after installing.
+> Log out and back in after installing. KDE, XFCE, and other desktops support the system tray natively — no extension needed.
 
 ## 🛠️ Development
 
