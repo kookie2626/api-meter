@@ -11,6 +11,7 @@
     --openai-color: #10B981;
     --anthropic-color: #F59E0B;
     --gemini-color: #8B5CF6;
+    --ollama-color: #E8751A;
     --balance-color: #34D399;
     --danger-color: #EF4444;
     --accent-glow: rgba(99, 102, 241, 0.15);
@@ -176,6 +177,7 @@ body {
 .openai-color { background: linear-gradient(90deg, #059669, #10B981); }
 .anthropic-color { background: linear-gradient(90deg, #D97706, #F59E0B); }
 .gemini-color { background: linear-gradient(90deg, #7C3AED, #8B5CF6); }
+.ollama-color { background: linear-gradient(90deg, #C2560A, #E8751A); }
 
 /* ======= Balance Badge ======= */
 .balance-row {

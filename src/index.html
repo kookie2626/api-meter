@@ -81,6 +81,9 @@
                 <div class="tab" id="tab-gemini" onclick="switchTab('gemini', this)" style="display:none;">
                     <span class="icon">✦</span> Gemini
                 </div>
+                <div class="tab" id="tab-ollama" onclick="switchTab('ollama', this)" style="display:none;">
+                    <span class="icon">🦙</span> Ollama
+                </div>
             </div>
 
             <div class="content">
@@ -150,6 +153,7 @@
                         <option value="OpenAI">OpenAI</option>
                         <option value="Anthropic">Anthropic (Claude)</option>
                         <option value="Gemini">Google (Gemini)</option>
+                        <option value="Ollama">Ollama (Cloud)</option>
                     </select>
                 </div>
                 <div class="input-group" id="anthropic-key-group" style="display:none;">
@@ -257,14 +261,17 @@
             const hasOpenAI = globalData.models.some(m => m.name === 'OpenAI' && m.spend > 0);
             const hasClaude = globalData.models.some(m => m.name === 'Anthropic' && m.spend > 0);
             const hasGemini = globalData.models.some(m => m.name === 'Gemini' && m.spend > 0);
+            const hasOllama = globalData.models.some(m => m.name === 'Ollama');
 
             document.getElementById('tab-openai').style.display = hasOpenAI ? '' : 'none';
             document.getElementById('tab-claude').style.display = hasClaude ? '' : 'none';
             document.getElementById('tab-gemini').style.display = hasGemini ? '' : 'none';
+            document.getElementById('tab-ollama').style.display = hasOllama ? '' : 'none';
 
             if ((currentTab === 'openai' && !hasOpenAI) ||
                 (currentTab === 'claude' && !hasClaude) ||
-                (currentTab === 'gemini' && !hasGemini)) {
+                (currentTab === 'gemini' && !hasGemini) ||
+                (currentTab === 'ollama' && !hasOllama)) {
                 currentTab = 'overview';
                 document.querySelectorAll('#main-view .tab').forEach(t => t.classList.remove('active'));
                 document.querySelector('#main-view .tab:first-child').classList.add('active');
@@ -283,6 +290,7 @@
             if (lower.includes('gpt') || lower.includes('openai')) return 'openai-color';
             if (lower.includes('claude') || lower.includes('anthropic')) return 'anthropic-color';
             if (lower.includes('gemini')) return 'gemini-color';
+            if (lower.includes('ollama')) return 'ollama-color';
             return 'overview-color';
         }
 
@@ -297,6 +305,11 @@
                 filteredModels = globalData.models.filter(m => m.name.toLowerCase().includes('claude') || m.name.toLowerCase().includes('anthropic'));
             } else if (currentTab === 'gemini') {
                 filteredModels = globalData.models.filter(m => m.name.toLowerCase().includes('gemini'));
+            } else if (currentTab === 'ollama') {
+                filteredModels = globalData.models.filter(m => m.name === 'Ollama');
+            } else {
+                // overview: Ollama 제외 (spend 없음, 별도 섹션)
+                filteredModels = globalData.models.filter(m => !m.isOllamaCloud);
             }
 
             const tabSpend = filteredModels.reduce((sum, m) => sum + m.spend, 0);
@@ -305,8 +318,53 @@
             document.getElementById('total-spend-big').textContent = `$${tabSpend.toFixed(2)}`;
             
             // Update section title based on tab
-            const titles = { overview: 'Monthly Spend', openai: 'OpenAI Spend', claude: 'Claude Spend', gemini: 'Gemini Spend' };
+            const titles = { overview: 'Monthly Spend', openai: 'OpenAI Spend', claude: 'Claude Spend', gemini: 'Gemini Spend', ollama: 'Ollama Cloud' };
             document.getElementById('section-title').textContent = titles[currentTab] || 'Monthly Spend';
+
+            if (currentTab === 'ollama') {
+                const ollamaData = filteredModels[0];
+                if (!ollamaData) { sendResize(); return; }
+                const planColors = { free: '#6B7280', pro: '#6366F1', max: '#E8751A' };
+                const planColor = planColors[ollamaData.plan] || '#6B7280';
+                const planLabel = ollamaData.plan ? ollamaData.plan.toUpperCase() : '–';
+                document.getElementById('total-spend-big').innerHTML =
+                    `<span style="font-size:22px; font-weight:700; color:${planColor};">${planLabel}</span>`;
+
+                function fmtReset(iso) {
+                    if (!iso) return '–';
+                    const diff = new Date(iso) - Date.now();
+                    if (diff <= 0) return 'Resetting...';
+                    const h = Math.floor(diff / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    if (h >= 24) return `${Math.floor(h/24)}d ${h%24}h`;
+                    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                }
+
+                container.innerHTML = `
+                    <div style="padding: 4px 0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-size:11px; color:var(--text-secondary);">Session Usage</span>
+                            <span style="font-size:11px; color:var(--text-tertiary);">Resets in ${fmtReset(ollamaData.sessionReset)}</span>
+                        </div>
+                        <div class="progress-bar" style="margin-bottom:12px;">
+                            <div class="progress-fill ollama-color" style="width:${ollamaData.sessionPct}%;"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-size:11px; color:var(--text-secondary);">Weekly Usage</span>
+                            <span style="font-size:11px; color:var(--text-tertiary);">Resets in ${fmtReset(ollamaData.weeklyReset)}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill ollama-color" style="width:${ollamaData.weeklyPct}%; opacity:0.7;"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                            <span style="font-size:10px; color:var(--text-tertiary);">Session: ${ollamaData.sessionPct.toFixed(1)}% used</span>
+                            <span style="font-size:10px; color:var(--text-tertiary);">Weekly: ${ollamaData.weeklyPct.toFixed(1)}% used</span>
+                        </div>
+                    </div>
+                `;
+                sendResize();
+                return;
+            }
 
             if (filteredModels.length === 0) {
                 container.innerHTML = `
@@ -393,6 +451,42 @@
                 `;
                 container.appendChild(itemDiv);
             });
+
+            // Overview 하단: Ollama Cloud 카드 (spend 없어서 별도)
+            if (currentTab === 'overview') {
+                const ollamaModel = globalData.models.find(m => m.isOllamaCloud);
+                if (ollamaModel) {
+                    const planColors = { free: '#6B7280', pro: '#6366F1', max: '#E8751A' };
+                    const planColor = planColors[ollamaModel.plan] || '#6B7280';
+                    const planLabel = ollamaModel.plan ? ollamaModel.plan.toUpperCase() : '–';
+                    const overviewOllama = document.createElement('div');
+                    overviewOllama.className = 'item';
+                    overviewOllama.innerHTML = `
+                        <div class="item-header">
+                            <span class="item-name">Ollama Cloud</span>
+                            <span style="font-size:11px; font-weight:600; color:${planColor}; background:${planColor}22; padding:2px 8px; border-radius:10px;">${planLabel}</span>
+                        </div>
+                        <div style="display:flex; gap:12px; margin-top:8px;">
+                            <div style="flex:1;">
+                                <div style="font-size:10px; color:var(--text-tertiary); margin-bottom:4px;">Session</div>
+                                <div class="progress-bar" style="height:4px;">
+                                    <div class="progress-fill ollama-color" style="width:${ollamaModel.sessionPct}%;"></div>
+                                </div>
+                                <div style="font-size:10px; color:var(--text-tertiary); margin-top:2px;">${ollamaModel.sessionPct.toFixed(1)}%</div>
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:10px; color:var(--text-tertiary); margin-bottom:4px;">Weekly</div>
+                                <div class="progress-bar" style="height:4px;">
+                                    <div class="progress-fill ollama-color" style="width:${ollamaModel.weeklyPct}%; opacity:0.7;"></div>
+                                </div>
+                                <div style="font-size:10px; color:var(--text-tertiary); margin-top:2px;">${ollamaModel.weeklyPct.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(overviewOllama);
+                }
+            }
+
             sendResize();
         }
 
