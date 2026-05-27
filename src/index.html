@@ -279,6 +279,7 @@
         }
 
         function switchTab(tabName, el) {
+            if (currentTab === tabName) return;
             currentTab = tabName;
             document.querySelectorAll('#main-view .tab').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
