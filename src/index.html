@@ -316,7 +316,9 @@
             
             // Update summary card
             document.getElementById('total-spend-big').textContent = `$${tabSpend.toFixed(2)}`;
-            
+            document.getElementById('current-month').textContent =
+                new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
             // Update section title based on tab
             const titles = { overview: 'Monthly Spend', openai: 'OpenAI Spend', claude: 'Claude Spend', gemini: 'Gemini Spend', ollama: 'Ollama Cloud' };
             document.getElementById('section-title').textContent = titles[currentTab] || 'Monthly Spend';
@@ -329,6 +331,7 @@
                 const planLabel = ollamaData.plan ? ollamaData.plan.toUpperCase() : '–';
                 document.getElementById('total-spend-big').innerHTML =
                     `<span style="font-size:22px; font-weight:700; color:${planColor};">${planLabel}</span>`;
+                document.getElementById('current-month').textContent = 'Cloud Usage';
 
                 function fmtReset(iso) {
                     if (!iso) return '–';
