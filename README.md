@@ -46,7 +46,7 @@ Click **Login & Connect** in Settings and log in to [platform.openai.com](https:
 This provides monthly spend, model breakdown, and per-API-key cost distribution.
 
 **Step 2 — Balance session (optional)**
-After connecting, click **잔액 연결** in the connected accounts list and log in to the Anthropic console. This enables the credit balance display. If the session expires, click **잔액 갱신** to reconnect.
+After connecting, click **Connect Balance** in the connected accounts list and log in to the Anthropic console. This enables the credit balance display. If the session expires, click **Refresh Balance** to reconnect.
 
 ### Gemini
 
@@ -55,48 +55,22 @@ Click **Login & Connect** in Settings and log in to [aistudio.google.com](https:
 ## 🚀 Installation
 
 ### macOS
-
-**One-line install**
 ```bash
 curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
 ```
-
-**Manual**
-1. Go to the [Releases page](../../releases/latest)
-2. Download `API-Meter-x.x.x-arm64.dmg`
-3. Open the DMG and drag **API Meter** into your Applications folder
+Or download `API-Meter-x.x.x-arm64.dmg` from the [Releases page](../../releases/latest), open it, and drag **API Meter** to Applications.
 
 ### Windows
-
-**One-line install** (PowerShell)
 ```powershell
 irm https://raw.githubusercontent.com/kookie2626/api-meter/main/install.ps1 | iex
 ```
+Or download `API-Meter-Setup-x.x.x.exe` from the [Releases page](../../releases/latest) and run it.
 
-**Manual**
-1. Go to the [Releases page](../../releases/latest)
-2. Download `API-Meter-Setup-x.x.x.exe` (installer) or `API-Meter-x.x.x.exe` (portable)
-3. Run the installer — the app appears in the system tray
-
-### Linux (Ubuntu / Debian)
-
-**One-line install**
+### Linux
 ```bash
 curl -sL https://raw.githubusercontent.com/kookie2626/api-meter/main/install.sh | bash
 ```
-Ubuntu/Debian: installs the `.deb` package. Other distros: downloads the AppImage.
-
-**Manual**
-
-AppImage (no install required):
-```bash
-chmod +x "API-Meter-x.x.x.AppImage" && ./"API-Meter-x.x.x.AppImage"
-```
-
-deb package:
-```bash
-sudo dpkg -i api-meter_x.x.x_amd64.deb
-```
+Ubuntu/Debian: installs the `.deb` package automatically. Other distros: downloads the AppImage.
 
 > **GNOME users:** The system tray requires the AppIndicator extension:
 > ```bash
