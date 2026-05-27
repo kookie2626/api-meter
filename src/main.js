@@ -142,8 +142,7 @@ function extractToken(raw) {
     return raw.replace(/^Bearer\s+/i, '').trim();
 }
 
-// 캐시 및 자동 새로고침
-let lastUsageData = null;
+// 자동 새로고침
 let autoRefreshTimer = null;
 let overlayWin = null;
 
@@ -153,10 +152,14 @@ function startAutoRefresh() {
     const intervalMin = settings.refreshInterval;
     if (!intervalMin || intervalMin <= 0) return;
     autoRefreshTimer = setInterval(async () => {
-        console.log('[AutoRefresh] Refreshing...');
-        const data = await fetchAllData();
-        if (mb.window && !mb.window.isDestroyed()) {
-            mb.window.webContents.send('usage-data-updated', data);
+        try {
+            console.log('[AutoRefresh] Refreshing...');
+            const data = await fetchAllData();
+            if (mb.window && !mb.window.isDestroyed()) {
+                mb.window.webContents.send('usage-data-updated', data);
+            }
+        } catch (err) {
+            console.error('[AutoRefresh] Error:', err.message);
         }
     }, intervalMin * 60 * 1000);
     console.log(`[AutoRefresh] Interval set: ${intervalMin}min`);
@@ -562,7 +565,6 @@ async function fetchAllData() {
     });
 
     data.models.sort((a, b) => b.spend - a.spend);
-    lastUsageData = data;
     return data;
 }
 

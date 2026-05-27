@@ -505,8 +505,7 @@
                             alias: result.provider,
                             key: result.token,
                             isCookie: result.isCookie || false,
-                            partition: result.partition
-                        };
+                            };
                         if (result.provider === 'OpenAI') {
                             const adminKey = document.getElementById('openai-admin-key').value.trim();
                             if (adminKey) entry.adminKey = adminKey;
@@ -549,6 +548,9 @@
                     renderKeys();
                     const sel = document.getElementById('refresh-interval-select');
                     if (sel) sel.value = String(interval || 0);
+                }).catch(() => {
+                    renderKeys();
+                    sendResize();
                 });
             } else {
                 sendResize();
