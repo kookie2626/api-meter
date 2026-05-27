@@ -41,6 +41,21 @@ mb.on('ready', () => {
         mb.window.setSkipTaskbar(true);
     }
 
+    // Linux: AppIndicator에서 click 이벤트가 오지 않는 DE가 있어 double-click도 처리
+    if (isLinux && mb.tray) {
+        let togglePending = false;
+        mb.tray.on('double-click', () => {
+            if (togglePending) return;
+            togglePending = true;
+            setTimeout(() => { togglePending = false; }, 300);
+            if (mb.window && mb.window.isVisible()) {
+                mb.hideWindow();
+            } else {
+                mb.showWindow();
+            }
+        });
+    }
+
     // macOS: menubar 내부가 show()를 호출하면 NSApp activate → Space 전환 발생
     // showInactive()로 대체해 현재 Space를 유지
     if (!isWindows && !isLinux && mb.window) {
@@ -89,6 +104,30 @@ mb.on('ready', () => {
                 overlayWin.showInactive(); // key window 안 바꾸도록
             }
             mb.window.moveTop(); // 같은 level 3 내에서 팝업이 오버레이 위에 오도록
+        }
+        // Linux: tray.getBounds()가 {0,0,0,0}을 반환하는 DE가 많아 직접 우상단에 배치
+        if (isLinux && mb.window) {
+            const { screen } = require('electron');
+            const trayBounds = mb.tray ? mb.tray.getBounds() : null;
+            const display = screen.getPrimaryDisplay();
+            const { x: wx, y: wy, width: ww, height: wh } = display.workArea;
+            const winBounds = mb.window.getBounds();
+            let px, py;
+            if (trayBounds && trayBounds.width > 0) {
+                px = Math.round(trayBounds.x + trayBounds.width / 2 - winBounds.width / 2);
+                py = trayBounds.y > wy + wh / 2
+                    ? trayBounds.y - winBounds.height - 4
+                    : trayBounds.y + trayBounds.height + 4;
+            } else {
+                // 트레이 위치 불명: 우상단 배치
+                px = wx + ww - winBounds.width - 8;
+                py = wy + 8;
+            }
+            mb.window.setPosition(
+                Math.max(wx, Math.min(px, wx + ww - winBounds.width)),
+                Math.max(wy, Math.min(py, wy + wh - winBounds.height)),
+                false
+            );
         }
     });
 
