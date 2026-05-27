@@ -347,14 +347,14 @@
                             <span style="font-size:11px; color:var(--text-tertiary);">Resets in ${fmtReset(ollamaData.sessionReset)}</span>
                         </div>
                         <div class="progress-bar" style="margin-bottom:12px;">
-                            <div class="progress-fill ollama-color" style="width:${ollamaData.sessionPct}%;"></div>
+                            <div class="progress-fill ollama-color" style="width:${Math.min(ollamaData.sessionPct, 100)}%;"></div>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                             <span style="font-size:11px; color:var(--text-secondary);">Weekly Usage</span>
                             <span style="font-size:11px; color:var(--text-tertiary);">Resets in ${fmtReset(ollamaData.weeklyReset)}</span>
                         </div>
                         <div class="progress-bar">
-                            <div class="progress-fill ollama-color" style="width:${ollamaData.weeklyPct}%; opacity:0.7;"></div>
+                            <div class="progress-fill ollama-color" style="width:${Math.min(ollamaData.weeklyPct, 100)}%; opacity:0.7;"></div>
                         </div>
                         <div style="display:flex; justify-content:space-between; margin-top:8px;">
                             <span style="font-size:10px; color:var(--text-tertiary);">Session: ${ollamaData.sessionPct.toFixed(1)}% used</span>
@@ -367,13 +367,17 @@
             }
 
             if (filteredModels.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align:center; color: var(--text-tertiary); padding: 24px 0;">
-                        <div style="font-size: 24px; margin-bottom: 8px;">📊</div>
-                        <div style="font-size: 11px;">No data available.<br>Connect an account in Settings.</div>
-                    </div>`;
-                sendResize();
-                return;
+                const hasOllamaCard = currentTab === 'overview' && globalData.models.some(m => m.isOllamaCloud);
+                if (!hasOllamaCard) {
+                    container.innerHTML = `
+                        <div style="text-align:center; color: var(--text-tertiary); padding: 24px 0;">
+                            <div style="font-size: 24px; margin-bottom: 8px;">📊</div>
+                            <div style="font-size: 11px;">No data available.<br>Connect an account in Settings.</div>
+                        </div>`;
+                    sendResize();
+                    return;
+                }
+                // Ollama만 연결된 경우: 아래 Ollama 카드 렌더로 계속
             }
 
             filteredModels.forEach(model => {
@@ -470,14 +474,14 @@
                             <div style="flex:1;">
                                 <div style="font-size:10px; color:var(--text-tertiary); margin-bottom:4px;">Session</div>
                                 <div class="progress-bar" style="height:4px;">
-                                    <div class="progress-fill ollama-color" style="width:${ollamaModel.sessionPct}%;"></div>
+                                    <div class="progress-fill ollama-color" style="width:${Math.min(ollamaModel.sessionPct, 100)}%;"></div>
                                 </div>
                                 <div style="font-size:10px; color:var(--text-tertiary); margin-top:2px;">${ollamaModel.sessionPct.toFixed(1)}%</div>
                             </div>
                             <div style="flex:1;">
                                 <div style="font-size:10px; color:var(--text-tertiary); margin-bottom:4px;">Weekly</div>
                                 <div class="progress-bar" style="height:4px;">
-                                    <div class="progress-fill ollama-color" style="width:${ollamaModel.weeklyPct}%; opacity:0.7;"></div>
+                                    <div class="progress-fill ollama-color" style="width:${Math.min(ollamaModel.weeklyPct, 100)}%; opacity:0.7;"></div>
                                 </div>
                                 <div style="font-size:10px; color:var(--text-tertiary); margin-top:2px;">${ollamaModel.weeklyPct.toFixed(1)}%</div>
                             </div>

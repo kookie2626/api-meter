@@ -540,7 +540,7 @@ async function fetchAllData() {
             const sessionSectionMatch = text.match(/(?:Session|Hourly) usage([\s\S]*?)(?:Weekly usage|$)/i);
             if (sessionSectionMatch) sessionPct = extractPct(sessionSectionMatch[1]);
 
-            const weeklySectionMatch = text.match(/Weekly usage([\s\S]*?)(?:\n\n|\z|$)/i);
+            const weeklySectionMatch = text.match(/Weekly usage([\s\S]*?)(?:\n\n|$)/i);
             if (weeklySectionMatch) weeklyPct = extractPct(weeklySectionMatch[1]);
 
             // Reset times: Session/Weekly 섹션 안의 data-time만 추출
