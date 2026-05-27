@@ -236,7 +236,6 @@ async function fetchAllData() {
         if (keyObj.adminKey) {
             try {
                 const adminHeaders = { 'Authorization': `Bearer ${keyObj.adminKey}` };
-                const now = new Date();
                 const startTs = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
                 const endTs = Math.floor(Date.now() / 1000);
 
@@ -610,8 +609,6 @@ ipcMain.handle('save-keys', (event, keys) => {
     return true;
 });
 
-
-
 // =============================================
 // 로그인 인증 (OpenAI = 세션토큰 캡처, Anthropic = URL 감지)
 // =============================================
@@ -655,7 +652,7 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
                 });
                 authWin.loadURL('https://platform.openai.com/login');
             };
-            authWin.webContents.session.clearStorageData().then(startOpenAIAuth).catch(startOpenAIAuth);
+            authWin.webContents.session.clearStorageData().catch(() => {}).then(startOpenAIAuth);
             
         } else if (provider === 'Anthropic') {
             // Anthropic: 페이지 타이틀 + URL 폴링으로 로그인 완료 감지
