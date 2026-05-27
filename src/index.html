@@ -620,6 +620,12 @@
                         btn.style.opacity = '1';
                     }, 3000);
                 });
+                window.electronAPI.onUpdateError(() => {
+                    const btn = document.getElementById('btn-check-update');
+                    btn.textContent = '⬇ Check Update';
+                    btn.style.pointerEvents = 'auto';
+                    btn.style.opacity = '1';
+                });
             }
         });
     </script>

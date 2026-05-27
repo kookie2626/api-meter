@@ -126,6 +126,10 @@ mb.on('ready', () => {
             mb.window.webContents.send('update-downloaded');
         }
     });
+    autoUpdater.on('error', (err) => {
+        console.error('[Updater] Error:', err.message);
+        if (mb.window && !mb.window.isDestroyed()) mb.window.webContents.send('update-error');
+    });
 });
 
 ipcMain.handle('check-for-update', () => {
@@ -652,7 +656,7 @@ ipcMain.handle('authenticate-provider', async (event, provider, alias) => {
                 });
                 authWin.loadURL('https://platform.openai.com/login');
             };
-            authWin.webContents.session.clearStorageData().catch(() => {}).then(startOpenAIAuth);
+            authWin.webContents.session.clearStorageData().catch(() => {}).then(startOpenAIAuth).catch(() => {});
             
         } else if (provider === 'Anthropic') {
             // Anthropic: 페이지 타이틀 + URL 폴링으로 로그인 완료 감지
