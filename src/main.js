@@ -118,13 +118,11 @@ mb.on('ready', () => {
     autoUpdater.on('update-available', () => console.log('Update available.'));
     autoUpdater.on('update-not-available', () => {
         console.log('Update not available.');
-        if (mb.window) mb.window.webContents.send('update-not-available');
+        if (mb.window && !mb.window.isDestroyed()) mb.window.webContents.send('update-not-available');
     });
     autoUpdater.on('update-downloaded', () => {
         console.log('Update downloaded. It will be installed on restart.');
-        if (mb.window) {
-            mb.window.webContents.send('update-downloaded');
-        }
+        if (mb.window && !mb.window.isDestroyed()) mb.window.webContents.send('update-downloaded');
     });
     autoUpdater.on('error', (err) => {
         console.error('[Updater] Error:', err.message);
@@ -338,7 +336,7 @@ async function fetchAllData() {
                 const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
                                      text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
                 if (balanceMatch) {
-                    balance = parseFloat(balanceMatch[1].replace(',', ''));
+                    balance = parseFloat(balanceMatch[1].replace(/,/g, ''));
                     console.log(`[Anthropic] Balance: $${balance}`);
                 }
 
@@ -488,7 +486,7 @@ async function fetchAllData() {
                 const balanceMatch = text.match(/US?\$\s*([\d,]+\.?\d*)/i) ||
                                      text.match(/(?:USD|크레딧|잔액)\s*\$?([\d,]+\.?\d*)/i);
                 if (balanceMatch) {
-                    balance = parseFloat(balanceMatch[1].replace(',', ''));
+                    balance = parseFloat(balanceMatch[1].replace(/,/g, ''));
                     console.log(`[Anthropic] Balance from session: $${balance}`);
                 } else {
                     console.log('[Anthropic] Balance: session expired, re-login needed');
