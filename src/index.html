@@ -522,10 +522,10 @@
             savedKeys.forEach((k, index) => {
                 let connType = k.isCookie ? 'Active Session' : 'Admin API Key';
                 if (k.isCookie && k.adminKey) connType = 'Session + Admin API Key';
-                if (!k.isCookie && k.provider === 'Anthropic') connType = k.cookieSession ? 'Admin Key + Balance Session' : 'Admin API Key (잔액 없음)';
+                if (!k.isCookie && k.provider === 'Anthropic') connType = k.cookieSession ? 'Admin Key + Balance Session' : 'Admin API Key (no balance)';
 
                 const balanceBtn = (!k.isCookie && k.provider === 'Anthropic')
-                    ? `<button class="btn-remove" style="border-color:var(--anthropic-color);color:var(--anthropic-color);margin-right:6px;" onclick="loginAnthropicBalance(${index})">${k.cookieSession ? '잔액 갱신' : '잔액 연결'}</button>`
+                    ? `<button class="btn-remove" style="border-color:var(--anthropic-color);color:var(--anthropic-color);margin-right:6px;" onclick="loginAnthropicBalance(${index})">${k.cookieSession ? 'Refresh Balance' : 'Connect Balance'}</button>`
                     : '';
 
                 html += `
