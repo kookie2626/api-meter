@@ -1,10 +1,20 @@
 const { app, ipcMain, BrowserWindow } = require('electron');
 const { menubar } = require('menubar');
-const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 
-const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
+let autoUpdater;
+try {
+    autoUpdater = require('electron-updater').autoUpdater;
+} catch (e) {
+    autoUpdater = { checkForUpdatesAndNotify: () => {}, quitAndInstall: () => {}, on: () => {} };
+}
+
+let SETTINGS_FILE;
+function getSettingsFile() {
+    if (!SETTINGS_FILE) SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json');
+    return SETTINGS_FILE;
+}
 
 const isWindows = process.platform === 'win32';
 const isLinux = process.platform === 'linux';
@@ -703,8 +713,8 @@ ipcMain.handle('save-refresh-interval', (event, minutes) => {
 // =============================================
 function getSettings() {
     try {
-        if (fs.existsSync(SETTINGS_FILE)) {
-            return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+        if (fs.existsSync(getSettingsFile())) {
+            return JSON.parse(fs.readFileSync(getSettingsFile(), 'utf8'));
         }
     } catch (e) {}
     return { keys: [] };
@@ -712,7 +722,7 @@ function getSettings() {
 
 function saveSettings(settings) {
     try {
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+        fs.writeFileSync(getSettingsFile(), JSON.stringify(settings, null, 2));
     } catch (e) {
         console.error('[Settings] Failed to save:', e.message);
     }
