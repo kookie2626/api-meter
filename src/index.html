@@ -258,9 +258,9 @@
         }
 
         function updateTabVisibility() {
-            const hasOpenAI = globalData.models.some(m => m.name === 'OpenAI' && m.spend > 0);
-            const hasClaude = globalData.models.some(m => m.name === 'Anthropic' && m.spend > 0);
-            const hasGemini = globalData.models.some(m => m.name === 'Gemini' && m.spend > 0);
+            const hasOpenAI = globalData.models.some(m => m.name === 'OpenAI');
+            const hasClaude = globalData.models.some(m => m.name === 'Anthropic');
+            const hasGemini = globalData.models.some(m => m.name === 'Gemini');
             const hasOllama = globalData.models.some(m => m.name === 'Ollama');
 
             document.getElementById('tab-openai').style.display = hasOpenAI ? '' : 'none';
