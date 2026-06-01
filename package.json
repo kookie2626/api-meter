@@ -89,12 +89,10 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
-    "menubar": "^9.5.2",
-    "pg": "^8.20.0"
+    "menubar": "^9.5.2"
   },
   "devDependencies": {
     "electron": "^42.2.0",
-    "electron-builder": "^26.8.1",
-    "png-to-ico": "^3.0.1"
+    "electron-builder": "^26.8.1"
   }
 }
