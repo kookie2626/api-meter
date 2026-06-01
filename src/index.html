@@ -390,10 +390,16 @@
                 
                 let balanceHtml = '';
                 if (model.balance !== undefined && model.balance !== null) {
+                    const refreshBtn = (currentTab === 'claude' && model.name === 'Anthropic')
+                        ? `<button onclick="refreshAnthropicBalance()" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:13px;padding:0;line-height:1;" title="Refresh Balance">↻</button>`
+                        : '';
                     balanceHtml = `
                         <div class="balance-row">
                             <span class="balance-label"><span class="status-dot"></span>Credit Balance</span>
-                            <span class="balance-value">$${model.balance.toFixed(2)}</span>
+                            <span style="display:flex;align-items:center;gap:6px;">
+                                <span class="balance-value">$${model.balance.toFixed(2)}</span>
+                                ${refreshBtn}
+                            </span>
                         </div>
                     `;
                 }
@@ -541,9 +547,7 @@
                 if (k.isCookie && k.adminKey) connType = 'Session + Admin API Key';
                 if (!k.isCookie && k.provider === 'Anthropic') connType = k.cookieSession ? 'Admin Key + Balance' : 'Admin API Key';
 
-                const balanceBtn = (!k.isCookie && k.provider === 'Anthropic' && k.cookieSession)
-                    ? `<button class="btn-remove" style="border-color:var(--anthropic-color);color:var(--anthropic-color);margin-right:6px;" onclick="loginAnthropicBalance(${index})">Refresh Balance</button>`
-                    : '';
+                const balanceBtn = '';
 
                 html += `
                     <div class="key-item">
@@ -572,6 +576,11 @@
                     refreshData();
                 }
             }).catch(() => {});
+        }
+
+        function refreshAnthropicBalance() {
+            const index = savedKeys.findIndex(k => k.provider === 'Anthropic' && !k.isCookie);
+            if (index >= 0) loginAnthropicBalance(index);
         }
 
         function onProviderChange(value) {
