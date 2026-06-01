@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+    getCachedData: () => ipcRenderer.invoke('get-cached-data'),
     getUsageData: () => ipcRenderer.invoke('get-usage-data'),
     loadKeys: () => ipcRenderer.invoke('load-keys'),
     saveKeys: (keys) => ipcRenderer.invoke('save-keys', keys),

@@ -196,6 +196,7 @@ function extractToken(raw) {
 // 자동 새로고침
 let autoRefreshTimer = null;
 let overlayWin = null;
+let cachedData = null;
 
 function startAutoRefresh() {
     if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
@@ -206,6 +207,7 @@ function startAutoRefresh() {
         try {
             console.log('[AutoRefresh] Refreshing...');
             const data = await fetchAllData();
+            cachedData = data;
             if (mb.window && !mb.window.isDestroyed()) {
                 mb.window.webContents.send('usage-data-updated', data);
             }
@@ -676,7 +678,13 @@ async function fetchAllData() {
     return data;
 }
 
-ipcMain.handle('get-usage-data', () => fetchAllData());
+ipcMain.handle('get-cached-data', () => cachedData);
+
+ipcMain.handle('get-usage-data', async () => {
+    const data = await fetchAllData();
+    cachedData = data;
+    return data;
+});
 
 ipcMain.handle('get-refresh-interval', () => {
     return getSettings().refreshInterval || 0;
