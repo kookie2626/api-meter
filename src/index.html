@@ -522,10 +522,10 @@
             savedKeys.forEach((k, index) => {
                 let connType = k.isCookie ? 'Active Session' : 'Admin API Key';
                 if (k.isCookie && k.adminKey) connType = 'Session + Admin API Key';
-                if (!k.isCookie && k.provider === 'Anthropic') connType = k.cookieSession ? 'Admin Key + Balance Session' : 'Admin API Key (no balance)';
+                if (!k.isCookie && k.provider === 'Anthropic') connType = k.cookieSession ? 'Admin Key + Balance' : 'Admin API Key';
 
-                const balanceBtn = (!k.isCookie && k.provider === 'Anthropic')
-                    ? `<button class="btn-remove" style="border-color:var(--anthropic-color);color:var(--anthropic-color);margin-right:6px;" onclick="loginAnthropicBalance(${index})">${k.cookieSession ? 'Refresh Balance' : 'Connect Balance'}</button>`
+                const balanceBtn = (!k.isCookie && k.provider === 'Anthropic' && k.cookieSession)
+                    ? `<button class="btn-remove" style="border-color:var(--anthropic-color);color:var(--anthropic-color);margin-right:6px;" onclick="loginAnthropicBalance(${index})">Refresh Balance</button>`
                     : '';
 
                 html += `
@@ -576,7 +576,7 @@
                 return;
             }
 
-            // Anthropic: Admin API key 직접 저장
+            // Anthropic: Admin API key 직접 저장 후 자동으로 잔액 세션 연결
             if (provider === 'Anthropic') {
                 const adminKey = document.getElementById('anthropic-admin-key').value.trim();
                 if (!adminKey.startsWith('sk-ant-admin')) {
@@ -587,6 +587,9 @@
                 if (window.electronAPI) window.electronAPI.saveKeys(savedKeys);
                 document.getElementById('anthropic-admin-key').value = '';
                 renderKeys();
+                // 자동으로 잔액 세션 연결
+                const newIndex = savedKeys.length - 1;
+                loginAnthropicBalance(newIndex);
                 return;
             }
 
