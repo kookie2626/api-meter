@@ -391,7 +391,7 @@
                 let balanceHtml = '';
                 if (model.balance !== undefined && model.balance !== null) {
                     const refreshBtn = (currentTab === 'claude' && model.name === 'Anthropic')
-                        ? `<button onclick="refreshAnthropicBalance()" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:13px;padding:0;line-height:1;" title="Refresh Balance">↻</button>`
+                        ? `<button onclick="refreshAnthropicBalance()" style="background:none;border:none;color:#E8751A;cursor:pointer;font-size:16px;padding:0;line-height:1;opacity:0.85;" title="Refresh Balance">↻</button>`
                         : '';
                     balanceHtml = `
                         <div class="balance-row">
